@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Fixed DB pool exhaustion under concurrent load causing 503/504 cascading failures
 -   Fixed event loop blocking during stager compilation, listener start, and plugin install
 -   Fixed unnecessary GitHub API call on every server startup when the compiler is already cached locally
+-   Fixed unhandled `TagInvalidException` in `parse_routing_packet` that caused request crashes from stale agents or non-agent traffic
+-   Fixed `TypeError` in BOF module parameter packing when integer values were passed to options that require space-checking
 
 ## [6.5.0] - 2026-03-08
 

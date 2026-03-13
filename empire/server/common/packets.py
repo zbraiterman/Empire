@@ -355,9 +355,15 @@ def parse_routing_packet(stagingKey, data):
         chacha_data = data[nonce_length + offset : chacha_header_length + offset]
         key = stagingKey.encode("UTF-8")
         enc_handler = encryption.ChaCha20Poly1305(key)
-        routingPacket = enc_handler.open(
-            chacha_nonce, chacha_data, b""
-        )  # Data set to null as we don't need it
+        try:
+            routingPacket = enc_handler.open(
+                chacha_nonce, chacha_data, b""
+            )  # Data set to null as we don't need it
+        except encryption.TagInvalidException:
+            log.warning(
+                "parse_agent_data(): invalid AEAD tag, likely wrong staging key or non-agent traffic"
+            )
+            return None
 
         sessionID = routingPacket[0:8].decode("UTF-8")
 
