@@ -550,6 +550,7 @@ def test_update_listener_autorun(client, admin_auth_header, listener):
             "module_id": "bof_situational_awareness_whoami",
             "ignore_language_version_check": False,
             "ignore_admin_check": False,
+            "background_override": None,
             "options": {"Architecture": "x64"},
             "modified_input": None,
         }

@@ -8,7 +8,7 @@ description: |
 software: ''
 tactics: [TA0007]
 techniques: [T1012, T1518, T1082]
-background: true
+background: false
 output_extension: ''
 needs_admin: false
 opsec_safe: true
@@ -21,16 +21,6 @@ options:
     value: --debug
     strict: false
     suggested_values: []
-  - name: Background
-    description: Run as a background job (non-blocking). Can be killed via the jobs/kill_job
-      endpoint.
-    required: false
-    value: 'false'
-    type: bool
-    suggested_values:
-      - 'true'
-      - 'false'
-    strict: true
 csharp:
   UnsafeCompile: true
   CompatibleDotNetVersions:

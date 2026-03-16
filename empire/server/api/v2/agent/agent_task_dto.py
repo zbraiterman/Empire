@@ -80,6 +80,7 @@ class ModulePostRequest(BaseModel):
     module_id: str
     ignore_language_version_check: bool = False
     ignore_admin_check: bool = False
+    background_override: bool | None = None
     options: dict[str, str | int | float]
     modified_input: str | None = None
 

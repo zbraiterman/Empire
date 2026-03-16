@@ -6,7 +6,6 @@ from unittest.mock import Mock
 import pytest
 
 from empire.server.core.exceptions import ModuleValidationException
-from empire.server.core.module_models import EmpireModuleOption
 from empire.server.core.module_service import ModuleService
 
 
@@ -199,49 +198,77 @@ def test_execute_module_task_command_csharp_agent_with_csharp_module(
 
 
 @pytest.mark.parametrize(
-    ("background_param", "expected_command"),
+    ("background_override", "expected_command"),
     [
-        ("false", "TASK_CSHARP_CMD_WAIT"),
-        ("true", "TASK_CSHARP_CMD_JOB"),
+        (False, "TASK_CSHARP_CMD_WAIT"),
+        (True, "TASK_CSHARP_CMD_JOB"),
+        (None, "TASK_CSHARP_CMD_JOB"),
     ],
 )
-def test_execute_module_background_param_override(
-    module_service, agent_mock, background_param, expected_command
+def test_execute_module_background_override(
+    module_service, agent_mock, background_override, expected_command
 ):
-    """Test that a runtime Background option overrides the module's YAML background setting."""
+    """Test that background_override overrides the module's YAML background setting."""
     agent_mock.language = "csharp"
     module_id = "csharp_credentials_rubeus"
 
     module = module_service.get_by_id(module_id)
     assert module.background is True, "Rubeus should have background=true in YAML"
 
-    # Add a Background option to the module so validation passes it through
-    original_options = module.options
-    background_option = EmpireModuleOption(
-        name="Background",
-        description="Run as background job",
-        required=False,
-        value="true",
-        type="bool",
-        suggested_values=["true", "false"],
-        strict=True,
+    params = {
+        "Agent": agent_mock.session_id,
+        "Command": "triage",
+    }
+    res, err = module_service.execute_module(
+        None,
+        agent_mock,
+        module_id,
+        params,
+        True,
+        True,
+        None,
+        background_override=background_override,
     )
-    module.options = [*original_options, background_option]
 
-    try:
-        params = {
-            "Agent": agent_mock.session_id,
-            "Command": "triage",
-            "Background": background_param,
-        }
-        res, err = module_service.execute_module(
-            None, agent_mock, module_id, params, True, True, None
-        )
+    assert err is None
+    assert res.command == expected_command
 
-        assert err is None
-        assert res.command == expected_command
-    finally:
-        module.options = original_options
+
+@pytest.mark.parametrize(
+    ("background_override", "expected_command"),
+    [
+        (True, "TASK_CSHARP_CMD_JOB"),
+        (False, "TASK_CSHARP_CMD_WAIT"),
+        (None, "TASK_CSHARP_CMD_WAIT"),
+    ],
+)
+def test_execute_module_background_override_default_false(
+    module_service, agent_mock, background_override, expected_command
+):
+    """Test background_override on a module whose YAML background defaults to false."""
+    agent_mock.language = "csharp"
+    module_id = "csharp_credentials_certify"
+
+    module = module_service.get_by_id(module_id)
+    assert module.background is False, "Certify should have background=false in YAML"
+
+    params = {
+        "Agent": agent_mock.session_id,
+        "Command": "find",
+    }
+    res, err = module_service.execute_module(
+        None,
+        agent_mock,
+        module_id,
+        params,
+        True,
+        True,
+        None,
+        background_override=background_override,
+    )
+
+    assert err is None
+    assert res.command == expected_command
 
 
 def test_execute_module_bof_custom_generate(module_service, agent_mock):

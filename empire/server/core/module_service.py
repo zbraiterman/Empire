@@ -111,6 +111,7 @@ class ModuleService:
         ignore_language_version_check: bool = False,
         ignore_admin_check: bool = False,
         modified_input: str | None = None,
+        background_override: bool | None = None,
     ) -> tuple[ModuleExecutionRequest | None, str | None]:
         """
         Execute the module. Note this doesn't actually add the task to the queue,
@@ -178,7 +179,11 @@ class ModuleService:
 
         extension = module.output_extension.rjust(5) if module.output_extension else ""
 
-        effective_background = cleaned_options.pop("Background", module.background)
+        effective_background = (
+            background_override
+            if background_override is not None
+            else module.background
+        )
 
         if agent.language in ("ironpython", "python"):
             if module.language == "python":
@@ -447,7 +452,7 @@ class ModuleService:
         }
 
         formatted_args = " ".join(
-            f'"{value}"' if " " in value else value
+            f'"{value}"' if " " in str(value) else str(value)
             for value in filtered_params.values()
         )
 
@@ -541,7 +546,7 @@ class ModuleService:
         }
 
         formatted_args = " ".join(
-            f'"{value}"' if " " in value else value
+            f'"{value}"' if " " in str(value) else str(value)
             for value in filtered_params.values()
         )
 
@@ -601,7 +606,7 @@ class ModuleService:
 
         # Create a list of arguments
         formatted_args = [
-            f'"{value}"' if " " in value else value
+            f'"{value}"' if " " in str(value) else str(value)
             for value in filtered_params.values()
         ]
 

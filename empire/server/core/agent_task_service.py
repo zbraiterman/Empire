@@ -351,6 +351,7 @@ class AgentTaskService:
             module_req.ignore_language_version_check,
             module_req.ignore_admin_check,
             modified_input=module_req.modified_input,
+            background_override=module_req.background_override,
         )
 
         if err:
