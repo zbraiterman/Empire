@@ -78,6 +78,6 @@ class Module:
 
         enc_script = launcher.split(" ")[-1]
 
-        script_end = f'Invoke-FodHelperBypass -Command "{enc_script}";`nInvoke-FodHelperBypass completed!'
+        script_end = f'Invoke-FodHelperBypass -Command "{enc_script}";`n"Invoke-FodHelperBypass completed!"'
 
         return script, script_end

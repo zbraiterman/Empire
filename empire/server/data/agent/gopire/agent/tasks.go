@@ -41,7 +41,7 @@ func (ma *MainAgent) csharpTaskBackground(data []byte, resultID int) {
 	params, _ := common.DecodeAndExtract(parts[1])
 	dataBytes, _ := base64.StdEncoding.DecodeString(parts[0])
 
-	routingPacket := ma.PacketHandler.BuildResponsePacket(122, "Task Started", resultID)
+	routingPacket := ma.PacketHandler.BuildResponsePacket(122, "Job started", resultID)
 	ma.preparepacket(routingPacket)
 
 	tasks.RunCsharpTaskInBackground(dataBytes, params, func(result string) {

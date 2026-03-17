@@ -1111,21 +1111,38 @@ class AgentCommunicationService:
             and data is not None
         ):
             # add keystrokes to database
-            if "function Get-Keystrokes" in tasking.input:
+            is_keylogger = "function Get-Keystrokes" in tasking.input or (
+                tasking.module_name
+                and "keylogger" in tasking.module_name.lower()
+                and tasking.task_name == "TASK_CSHARP_CMD_JOB"
+            )
+            if is_keylogger:
                 tasking.status = AgentTaskStatus.continuous
                 key_log_task_id = tasking.id
-                if tasking.output is None:
+                if tasking.output is None or tasking.output.startswith(
+                    ("Task Started", "Job started")
+                ):
                     tasking.output = ""
 
                 if data:
-                    raw_key_stroke = data.decode("UTF-8")
-                    tasking.output += (
-                        raw_key_stroke.replace("\r\n", "")
-                        .replace("[SpaceBar]", "")
-                        .replace("\b", "")
-                        .replace("[Shift]", "")
-                        .replace("[Enter]\r", "\r\n")
+                    raw_key_stroke = (
+                        data.decode("UTF-8") if isinstance(data, bytes) else data
                     )
+                    if tasking.task_name == "TASK_CSHARP_CMD_JOB":
+                        # C# keylogger: strip pipe noise, convert markers
+                        raw_key_stroke = raw_key_stroke.replace("\r\n", "").replace(
+                            "[NL]", "\n"
+                        )
+                    else:
+                        # PowerShell keylogger uses [Enter] markers
+                        raw_key_stroke = (
+                            raw_key_stroke.replace("\r\n", "")
+                            .replace("[SpaceBar]", "")
+                            .replace("\b", "")
+                            .replace("[Shift]", "")
+                            .replace("[Enter]\r", "\r\n")
+                        )
+                    tasking.output += raw_key_stroke
             else:
                 tasking.original_output = data
                 tasking.output = data
@@ -1410,7 +1427,7 @@ class AgentCommunicationService:
             "TASK_PYTHON_CMD_JOB",
             "TASK_CSHARP_CMD_JOB",
         ]:
-            # check if this is the powershell keylogging task, if so, write output to file instead of screen
+            # check if this is a keylogging task, if so, write output to file instead of screen
             if key_log_task_id and key_log_task_id == task_id:
                 download_dir = empire_config.directories.downloads
                 save_path = download_dir / session_id / "keystrokes.txt"
@@ -1421,13 +1438,16 @@ class AgentCommunicationService:
                 with save_path.open("a+") as f:
                     if isinstance(data, bytes):
                         data = data.decode("UTF-8")
-                    new_results = (
-                        data.replace("\r\n", "")
-                        .replace("[SpaceBar]", "")
-                        .replace("\b", "")
-                        .replace("[Shift]", "")
-                        .replace("[Enter]\r", "\r\n")
-                    )
+                    if response_name == "TASK_CSHARP_CMD_JOB":
+                        new_results = data.replace("\r\n", "").replace("[NL]", "\n")
+                    else:
+                        new_results = (
+                            data.replace("\r\n", "")
+                            .replace("[SpaceBar]", "")
+                            .replace("\b", "")
+                            .replace("[Shift]", "")
+                            .replace("[Enter]\r", "\r\n")
+                        )
                     f.write(new_results)
 
             else:

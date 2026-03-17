@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -178,12 +179,74 @@ func RunCsharpTaskInBackground(data []byte, params []string, callback func(strin
 		ensureWorkDir()
 
 		versionString := "v4.0.30319"
-		result, err := LoadAssembly(decompressedData, params, versionString)
-		if err != nil {
-			callback("Failed to run assembly")
+		rtHost := clrInstance.GetRuntimeHost(versionString)
+		if rtHost == nil {
+			callback("Failed to acquire CLR runtime host")
 			return
 		}
-		callback(result)
+
+		var methodInfo *clr.MethodInfo
+		if asm := getAssembly(decompressedData); asm != nil {
+			methodInfo = asm.methodInfo
+		} else {
+			var loadErr error
+			methodInfo, loadErr = clr.LoadAssembly(rtHost, decompressedData)
+			if loadErr != nil {
+				callback(fmt.Sprintf("LoadAssembly failed: %v", loadErr))
+				return
+			}
+			addAssembly(methodInfo, decompressedData)
+		}
+
+		if len(params) == 1 && params[0] == "" {
+			params = []string{" "}
+		}
+
+		if serializeInvokes {
+			invokeMu.Lock()
+			defer invokeMu.Unlock()
+		}
+
+		// Clear stale stdout
+		_, _, _ = clr.ReadStdoutStderr()
+
+		// Run the assembly in a separate goroutine so we can poll stdout
+		done := make(chan string, 1)
+		go func() {
+			stdout0, _ := clr.InvokeAssembly(methodInfo, params)
+			done <- stdout0
+		}()
+
+		// Poll stdout periodically and stream results back via callback
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case stdout0 := <-done:
+				// Assembly finished — final drain
+				ticker.Stop()
+				time.Sleep(200 * time.Millisecond)
+				out := stdout0
+				for i := 0; i < 2000; i++ {
+					so, _, _ := clr.ReadStdoutStderr()
+					if so == "" {
+						break
+					}
+					out += so
+					runtime.Gosched()
+				}
+				if strings.TrimSpace(out) != "" {
+					callback(strings.TrimRight(out, "\r\n"))
+				}
+				return
+			case <-ticker.C:
+				so, _, _ := clr.ReadStdoutStderr()
+				if strings.TrimSpace(so) != "" {
+					callback(strings.TrimRight(so, "\r\n"))
+				}
+			}
+		}
 	}()
 }
 

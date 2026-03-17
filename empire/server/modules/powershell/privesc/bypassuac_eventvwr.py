@@ -44,6 +44,6 @@ class Module:
         encScript = launcher.split(" ")[-1]
         if launcher == "":
             raise ModuleValidationException("Error in launcher generation.")
-        script_end = f'Invoke-EventVwrBypass -Command "{encScript}"'
+        script_end = f'Invoke-EventVwrBypass -Command "{encScript}";`n"Invoke-EventVwrBypass completed!"'
 
         return script, script_end

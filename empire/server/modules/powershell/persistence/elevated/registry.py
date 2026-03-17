@@ -67,6 +67,7 @@ class Module:
                 + key_name
                 + ";"
             )
+            script += "'Registry persistence removed.'"
             return main_menu.modulesv2.finalize_module(
                 script=script,
                 script_end="",

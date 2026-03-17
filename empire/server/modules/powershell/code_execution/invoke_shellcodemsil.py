@@ -28,4 +28,5 @@ class Module:
                 sc = ",0".join(values.split("\\"))[1:]
                 script_end += " -" + str(option) + " @(" + sc + ")"
 
+        script_end += ';`n"Invoke-ShellcodeMSIL completed."'
         return script, script_end

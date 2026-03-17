@@ -43,6 +43,6 @@ class Module:
 
         if launcher == "":
             raise ModuleValidationException("Error in launcher generation.")
-        script_end = f'Invoke-WScriptBypassUAC -payload "{launcher}"'
+        script_end = f'Invoke-WScriptBypassUAC -payload "{launcher}";`n"Invoke-WScriptBypassUAC completed!"'
 
         return script, script_end

@@ -106,5 +106,7 @@ This will write out "Is Elevated: True" to C:\UACBypassTest.
             Stop-Process -Id $Process.Id
             Write-Verbose "Killed running eventvwr process"
         }
+
+        "Invoke-EventVwrBypass completed."
     }
 }

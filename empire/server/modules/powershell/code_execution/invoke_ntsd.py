@@ -84,5 +84,6 @@ class Module:
         script_end += "Start-Sleep -s 5"
         script_end += "\r\n"
         script_end += code_exec
+        script_end += '\r\n"Invoke-NTSD completed."'
 
         return script, script_end

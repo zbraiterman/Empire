@@ -44,5 +44,7 @@ class Module:
         if launcher == "":
             raise ModuleValidationException("Error in launcher generation.")
 
-        script_end = f'Invoke-EnvBypass -Command "{enc_script}"'
+        script_end = (
+            f'Invoke-EnvBypass -Command "{enc_script}";`n"Invoke-EnvBypass completed!"'
+        )
         return script, script_end

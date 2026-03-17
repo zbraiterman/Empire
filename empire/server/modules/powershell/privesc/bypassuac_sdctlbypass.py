@@ -45,5 +45,5 @@ class Module:
         if launcher == "":
             raise ModuleValidationException("Error in launcher generation.")
 
-        script_end = f'Invoke-SDCLTBypass -Command "{enc_script}"'
+        script_end = f'Invoke-SDCLTBypass -Command "{enc_script}";`n"Invoke-SDCLTBypass completed!"'
         return script, script_end

@@ -63,4 +63,5 @@ class Module:
                 f"Invoke-PSInject -ProcName {proc_name} -PoshCode {launcher_code}"
             )
 
+        script_end += ';`n"Invoke-PSInject completed."'
         return script, script_end

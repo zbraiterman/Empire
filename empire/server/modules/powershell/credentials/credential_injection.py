@@ -67,4 +67,5 @@ class Module:
                 else:
                     script_end += " -" + str(option) + " " + str(values)
 
+        script_end += ';`n"Invoke-CredentialInjection completed."'
         return script, script_end

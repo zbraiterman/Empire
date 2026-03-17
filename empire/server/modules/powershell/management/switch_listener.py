@@ -30,7 +30,7 @@ class Module:
         ).generate_comms(listenerOptions=listener_options, language="powershell")
 
         # signal the existing listener that we're switching listeners, and the new comms code
-        script = f"Send-Message -Packets $(Encode-Packet -Type 130 -Data '{listener_name}');\n{script}"
+        script = f"Send-Message -Packets $(Encode-Packet -Type 130 -Data '{listener_name}');\n{script}\n'Listener switched to {listener_name}.'"
 
         return main_menu.modulesv2.finalize_module(
             script=script,
