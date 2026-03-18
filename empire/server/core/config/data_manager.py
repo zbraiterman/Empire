@@ -1,5 +1,6 @@
 import logging
 import platform
+import tarfile
 from pathlib import Path
 
 import requests
@@ -10,7 +11,6 @@ from empire.server.core.config.config_manager import (
     PluginRegistryConfig,
     StarkillerConfig,
 )
-from empire.server.utils.file_util import run_as_user
 from empire.server.utils.git_util import clone_git_repo
 
 log = logging.getLogger(__name__)
@@ -140,18 +140,17 @@ def sync_empire_compiler(compiler_config: EmpireCompilerConfig):
 
     name = url.split("/")[-1].removesuffix(".tgz")
 
-    log.info("Empire Compiler: directory not found. Downloading Empire Compiler")
-    log.info(f"Empire Compiler: fetching and unarchiving {url}")
-    compiler_dir.mkdir(parents=True, exist_ok=True)
-    run_as_user(
-        ["curl", "-fSL", url, "-o", str(compiler_dir / f"{name}.tgz")],
-    )
-    run_as_user(
-        ["tar", "-xzf", str(compiler_dir / f"{name}.tgz"), "-C", str(compiler_dir)],
-    )
-    (compiler_dir / f"{name}.tgz").unlink(missing_ok=True)
+    if not Path(compiler_dir / name).exists():
+        log.info("Empire Compiler: directory not found. Downloading Empire Compiler")
+        log.info(f"Empire Compiler: fetching and unarchiving {url}")
+        compiler_dir.mkdir(parents=True, exist_ok=True)
+        with (
+            requests.get(url, stream=True) as resp,
+            tarfile.open(fileobj=resp.raw, mode="r|gz") as tar,
+        ):
+            tar.extractall(compiler_dir)
 
-    extracted_folder = next(d for d in compiler_dir.iterdir() if d.is_dir())
+    extracted_folder = compiler_dir / name
     return _configure_compiler(compiler_config, extracted_folder)
 
 
