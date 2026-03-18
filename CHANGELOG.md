@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+-   Removed legacy `archive` field from `empire_compiler` config; use `repo` and `ref` instead
+
+### Fixed
+
+-   Fixed unnecessary GitHub API call on every server startup when the compiler is already cached locally
+
 ## [6.5.0] - 2026-03-08
 
 ### Added
@@ -24,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Added `clipboard_window_inject_list` BOF module for enumerating processes with clipboard window class
 -   Added PIC shellcode C template and linker script for MinGW-based shellcode compilation
 -   Added unit tests for `shellcode_compiler` and rewrote `test_bof_packer` to cover the new `Packer` class API
+-   Added `repo` and `ref` fields to `empire_compiler` config, replacing the hardcoded archive URL with GitHub Releases API asset discovery
+-   Added unit tests for compiler platform resolution and download URL logic
 -   Added a runtime `Background` option to C# modules, allowing operators to override background/foreground execution at task time
 -   Added C# PatchETW module for in-process ETW patching via ntdll!EtwEventWrite
 -   Added C# PatchlessAMSI module for patchless AMSI bypass using hardware breakpoints and vectored exception handling

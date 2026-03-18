@@ -40,7 +40,8 @@ database:
       - mattifestation
       - etw
 empire_compiler:
-  archive: https://github.com/BC-SECURITY/Empire-Compiler/releases/download/v0.4.1/EmpireCompiler-{{platform}}-v0.4.1.tgz
+  repo: BC-SECURITY/Empire-Compiler
+  ref: v0.4.4
   confuser_proj: empire/server/data/confuser.crproj
 starkiller:
   enabled: true
