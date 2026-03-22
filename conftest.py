@@ -16,16 +16,23 @@ def pytest_addoption(parser):
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
     config.addinivalue_line("markers", "no_docker: mark test as failing in docker")
+    config.addinivalue_line(
+        "markers", "compiler: requires C# compiler (EmpireCompiler)"
+    )
+    config.addinivalue_line(
+        "markers", "mysql: mark test as requiring MySQL (and Docker)"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--runslow"):
         # --runslow given in cli: do not skip slow tests
-        return
-    skip_slow = pytest.mark.skip(reason="need --runslow option to run")
-    for item in items:
-        if "slow" in item.keywords:
-            item.add_marker(skip_slow)
+        pass
+    else:
+        skip_slow = pytest.mark.skip(reason="need --runslow option to run")
+        for item in items:
+            if "slow" in item.keywords:
+                item.add_marker(skip_slow)
 
     if config.getoption("--nodocker"):
         # --nodocker given in cli: skip tests that fail in docker

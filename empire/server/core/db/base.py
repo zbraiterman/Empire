@@ -8,6 +8,7 @@ from sqlalchemy import Index, UniqueConstraint, create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import close_all_sessions, sessionmaker
+from sqlalchemy.pool import Pool, QueuePool
 
 from empire.server.core.db import models
 from empire.server.core.db.defaults import (
@@ -84,7 +85,21 @@ if use == "mysql":
     engine = try_create_engine(mysql_url, echo=False)
     with engine.connect() as connection:
         connection.execute(text(f"CREATE DATABASE IF NOT EXISTS {database_name}"))
-    engine = try_create_engine(f"{mysql_url}/{database_name}", echo=False)
+    engine = try_create_engine(
+        f"{mysql_url}/{database_name}",
+        echo=False,
+        pool_size=database_config.pool_size,
+        max_overflow=database_config.max_overflow,
+        pool_pre_ping=database_config.pool_pre_ping,
+        pool_recycle=database_config.pool_recycle,
+    )
+    log.info(
+        "MySQL pool: size=%d, max_overflow=%d, pre_ping=%s, recycle=%ds",
+        database_config.pool_size,
+        database_config.max_overflow,
+        database_config.pool_pre_ping,
+        database_config.pool_recycle,
+    )
 else:
     location = database_config.location
     engine = try_create_engine(
@@ -100,6 +115,38 @@ else:
             models.Host.name, models.Host.internal_ip, name="host_unique_idx"
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Pool health logging
+# ---------------------------------------------------------------------------
+_POOL_WARN_THRESHOLD = 0.8  # warn when 80% of pool capacity is in use
+
+
+@event.listens_for(Pool, "checkout")
+def _on_pool_checkout(dbapi_conn, connection_rec, connection_proxy):
+    try:
+        pool = connection_proxy._pool  # noqa: SLF001
+        if not isinstance(pool, QueuePool):
+            return
+        pool_size = pool.size()
+        overflow = pool.overflow()
+        max_overflow = pool._max_overflow  # noqa: SLF001
+        checked_out = pool.checkedout()
+        total_capacity = pool_size + max_overflow
+        if total_capacity > 0 and checked_out / total_capacity >= _POOL_WARN_THRESHOLD:
+            log.warning(
+                "DB pool nearing capacity: %d/%d connections in use "
+                "(pool_size=%d, overflow=%d/%d)",
+                checked_out,
+                total_capacity,
+                pool_size,
+                overflow,
+                max_overflow,
+            )
+    except Exception:
+        log.warning("Pool health check failed — monitoring degraded", exc_info=True)
+
 
 SessionLocal = sessionmaker(bind=engine)
 Base.metadata.create_all(engine)

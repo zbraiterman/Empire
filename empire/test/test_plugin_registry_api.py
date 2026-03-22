@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
-from unittest.mock import ANY, Mock
+from unittest.mock import ANY, AsyncMock
 
 import pytest
 from starlette import status
@@ -90,13 +90,13 @@ def test_install_plugin_version_not_found(client, admin_auth_header):
 
 @contextmanager
 def patch_install_plugin_from_git(plugin_service):
-    mock = Mock()
-    original = plugin_service.install_plugin_from_git
-    plugin_service.install_plugin_from_git = mock
+    mock = AsyncMock()
+    original = plugin_service.install_plugin_from_git_async
+    plugin_service.install_plugin_from_git_async = mock
 
     yield mock
 
-    plugin_service.install_plugin_from_git = original
+    plugin_service.install_plugin_from_git_async = original
 
 
 class IsDict:
@@ -133,13 +133,13 @@ def test_install_plugin_git(client, admin_auth_header, plugin_service):
 
 @contextmanager
 def patch_install_plugin_from_tar(plugin_service):
-    mock = Mock()
-    original = plugin_service.install_plugin_from_tar
-    plugin_service.install_plugin_from_tar = mock
+    mock = AsyncMock()
+    original = plugin_service.install_plugin_from_tar_async
+    plugin_service.install_plugin_from_tar_async = mock
 
     yield mock
 
-    plugin_service.install_plugin_from_tar = original
+    plugin_service.install_plugin_from_tar_async = original
 
 
 def test_install_plugin_tar(client, admin_auth_header, plugin_service):

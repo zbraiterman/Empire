@@ -160,13 +160,20 @@ async def install_plugin_git(
     plugin_service: PluginServiceDep,
 ):
     try:
-        plugin_service.install_plugin_from_git(db, req.url, req.subdirectory, req.ref)
+        await plugin_service.install_plugin_from_git_async(
+            db, req.url, req.subdirectory, req.ref
+        )
     except GitOperationException as e:
         raise HTTPException(
             status_code=400, detail=f"Failed to install plugin from git: {e}"
         ) from e
     except PluginValidationException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error installing plugin: {type(e).__name__}: {e}",
+        ) from e
 
 
 @router.post("/install/tar")
@@ -176,6 +183,13 @@ async def install_plugin_tar(
     plugin_service: PluginServiceDep,
 ):
     try:
-        plugin_service.install_plugin_from_tar(db, req.url, req.subdirectory)
+        await plugin_service.install_plugin_from_tar_async(
+            db, req.url, req.subdirectory
+        )
     except PluginValidationException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error installing plugin: {type(e).__name__}: {e}",
+        ) from e

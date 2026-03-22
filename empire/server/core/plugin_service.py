@@ -6,6 +6,7 @@ import sys
 import tarfile
 import tempfile
 import typing
+import warnings
 from pathlib import Path
 
 import requests
@@ -181,6 +182,29 @@ class PluginService:
 
         plugin_obj.enabled = db_plugin.enabled
 
+    def _validate_and_load_plugin(
+        self, db, temp_dir, subdir, version_name, registry_data
+    ):
+        """Shared post-download logic: validate, merge config, load."""
+        temp_dir = temp_dir / subdir if subdir else temp_dir
+        plugin_dir, plugin_config = self._validate_temp_plugin(db, temp_dir)
+        plugin_config = self._merge_plugin_config(plugin_config, registry_data)
+        self.load_plugin(db, plugin_dir, plugin_config, version_name)
+
+    def _download_tar(self, tar_url):
+        """Download and extract a tar archive. Returns the temp directory."""
+        temp_dir = (
+            Path(tempfile.gettempdir()) / Path(tar_url.rsplit("/", maxsplit=1)[-1]).stem
+        )
+        response = s.get(tar_url, stream=True)
+        if response.status_code != HTTP_200_OK:
+            raise PluginValidationException(
+                f"Failed to download plugin: {response.text}"
+            )
+        with tarfile.open(fileobj=response.raw, mode="r|*") as tar:
+            tar.extractall(path=temp_dir)
+        return temp_dir
+
     def install_plugin_from_git(  # noqa: PLR0913
         self,
         db: Session,
@@ -190,12 +214,31 @@ class PluginService:
         version_name: str | None = None,
         registry_data: dict | None = None,
     ):
+        """.. deprecated:: Use ``install_plugin_from_git_async``. Will be removed in 7.0."""
+        warnings.warn(
+            "install_plugin_from_git() is deprecated, use install_plugin_from_git_async()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         temp_dir = git_util.clone_git_repo(git_url, ref)
-        temp_dir = temp_dir / subdir if subdir else temp_dir
-        plugin_dir, plugin_config = self._validate_temp_plugin(db, temp_dir)
-        plugin_config = self._merge_plugin_config(plugin_config, registry_data)
+        self._validate_and_load_plugin(
+            db, temp_dir, subdir, version_name, registry_data
+        )
 
-        self.load_plugin(db, plugin_dir, plugin_config, version_name)
+    async def install_plugin_from_git_async(  # noqa: PLR0913
+        self,
+        db: Session,
+        git_url: str,
+        subdir: str | None = None,
+        ref: str | None = None,
+        version_name: str | None = None,
+        registry_data: dict | None = None,
+    ):
+        """Like ``install_plugin_from_git`` but offloads git clone to a thread."""
+        temp_dir = await asyncio.to_thread(git_util.clone_git_repo, git_url, ref)
+        self._validate_and_load_plugin(
+            db, temp_dir, subdir, version_name, registry_data
+        )
 
     def install_plugin_from_tar(
         self,
@@ -205,26 +248,30 @@ class PluginService:
         version_name: str | None = None,
         registry_data: dict | None = None,
     ):
-        temp_dir = (
-            Path(tempfile.gettempdir()) / Path(tar_url.rsplit("/", maxsplit=1)[-1]).stem
+        """.. deprecated:: Use ``install_plugin_from_tar_async``. Will be removed in 7.0."""
+        warnings.warn(
+            "install_plugin_from_tar() is deprecated, use install_plugin_from_tar_async()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        temp_dir = self._download_tar(tar_url)
+        self._validate_and_load_plugin(
+            db, temp_dir, subdir, version_name, registry_data
         )
 
-        response = s.get(tar_url, stream=True)
-
-        if response.status_code != HTTP_200_OK:
-            raise PluginValidationException(
-                f"Failed to download plugin: {response.text}"
-            )
-
-        with tarfile.open(fileobj=response.raw, mode="r|*") as tar:
-            tar.extractall(path=temp_dir)
-
-        temp_dir = temp_dir / subdir if subdir else temp_dir
-
-        plugin_dir, plugin_config = self._validate_temp_plugin(db, temp_dir)
-        plugin_config = self._merge_plugin_config(plugin_config, registry_data)
-
-        self.load_plugin(db, plugin_dir, plugin_config, version_name)
+    async def install_plugin_from_tar_async(
+        self,
+        db: Session,
+        tar_url: str,
+        subdir: str | None = None,
+        version_name: str | None = None,
+        registry_data: dict | None = None,
+    ):
+        """Like ``install_plugin_from_tar`` but offloads download to a thread."""
+        temp_dir = await asyncio.to_thread(self._download_tar, tar_url)
+        self._validate_and_load_plugin(
+            db, temp_dir, subdir, version_name, registry_data
+        )
 
     @staticmethod
     def _merge_plugin_config(plugin_config, registry_data):

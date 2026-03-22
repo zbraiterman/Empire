@@ -58,7 +58,7 @@ async def install_plugin(
     plugin_registry_service: PluginRegistryServiceDep,
 ):
     try:
-        plugin_registry_service.install_plugin(
+        await plugin_registry_service.install_plugin(
             db, install_req.name, install_req.version, install_req.registry
         )
     except PluginValidationException as e:

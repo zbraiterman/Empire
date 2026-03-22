@@ -109,6 +109,10 @@ class MySQLDatabaseConfig(EmpireBaseModel):
     username: str = ""
     password: str = ""
     database_name: str = "empire"
+    pool_size: int = 10
+    max_overflow: int = 15
+    pool_pre_ping: bool = True
+    pool_recycle: int = 3600
 
 
 class DatabaseConfig(EmpireBaseModel):

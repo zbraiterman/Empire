@@ -43,7 +43,7 @@ api:
 
 * **database** - Configure Empire's database. Empire utilizes MySQL by default for high performance database operations. It can be configured to use sqlite for more lightweight implementations if required For more info on the database, see the [Database](https://github.com/BC-SECURITY/Empire/blob/main/docs/quickstart/database/README.md) section.
 
-MySQL supports customizing the default url, username, password, and database name. By default these are set to
+MySQL supports customizing the default url, username, password, database name, and connection pool settings. By default these are set to
 
 ```yaml
 database:
@@ -53,7 +53,13 @@ database:
     username: empire_user
     password: empire_password
     database_name: empire
+    pool_size: 10        # base connections kept open
+    max_overflow: 15     # extra connections allowed under load
+    pool_pre_ping: true  # detect stale connections before use
+    pool_recycle: 3600   # recycle connections after N seconds
 ```
+
+The connection pool defaults (25 total connections) handle typical deployments. For heavier workloads with many concurrent agents, increase `pool_size` and `max_overflow`.
 
 If using SQLite the database location is customizable with the default setting:
 

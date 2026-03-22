@@ -132,12 +132,12 @@ class PluginRegistryService:
             ]
         }
 
-    def install_plugin(self, db, name, version, registry):
+    async def install_plugin(self, db, name, version, registry):
         version = self._validate_install(db, name, registry, version)
         registry_data = self._get_plugin_registry_entry(db, name, registry)
 
         if version.get("git_url"):
-            self.plugin_service.install_plugin_from_git(
+            await self.plugin_service.install_plugin_from_git_async(
                 db,
                 version["git_url"],
                 version.get("subdirectory"),
@@ -147,7 +147,7 @@ class PluginRegistryService:
             )
 
         else:
-            self.plugin_service.install_plugin_from_tar(
+            await self.plugin_service.install_plugin_from_tar_async(
                 db,
                 version["tar_url"],
                 version.get("subdirectory"),

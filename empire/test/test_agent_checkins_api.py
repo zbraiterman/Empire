@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 from starlette import status
 
+from empire.server.core.agent_service import AgentService
 from empire.server.utils.string_util import get_random_string
 from empire.test.conftest import make_agent
 
@@ -78,6 +79,32 @@ def agents_with_checkins(session_local, models):
             db.add(
                 models.AgentCheckIn(agent_id=agent_id, checkin_time=datetime.now(UTC))
             )
+
+
+def test_update_agent_lastseen_duplicate_ignored(session_local, models, agent):
+    """Calling update_agent_lastseen twice in the same second should not
+    raise and should produce exactly one check-in row for that second.
+    """
+    with session_local.begin() as db:
+        initial_count = (
+            db.query(models.AgentCheckIn)
+            .filter(models.AgentCheckIn.agent_id == agent)
+            .count()
+        )
+
+    with session_local.begin() as db:
+        AgentService.update_agent_lastseen(db, agent)
+        AgentService.update_agent_lastseen(db, agent)
+        db.flush()
+
+    with session_local.begin() as db:
+        final_count = (
+            db.query(models.AgentCheckIn)
+            .filter(models.AgentCheckIn.agent_id == agent)
+            .count()
+        )
+        # Two calls in the same second should add at most 1 new row
+        assert final_count - initial_count <= 1
 
 
 def test_get_agent_checkins_agent_not_found(client, admin_auth_header):

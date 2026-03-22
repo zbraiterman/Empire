@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
@@ -19,6 +20,8 @@ from empire.server.api.v2.shared_dto import BadRequestResponse, NotFoundResponse
 from empire.server.api.v2.tag import tag_api
 from empire.server.core.db import models
 from empire.server.core.listener_service import ListenerService
+
+log = logging.getLogger(__name__)
 
 
 def get_listener_service(main: AppCtx) -> ListenerService:
@@ -79,13 +82,7 @@ async def create_listener(
     db: CurrentSession,
     listener_service: ListenerServiceDep,
 ):
-    """
-    Note: options['Name'] will be overwritten by name. When v1 api is eventually removed, it wil no longer be needed.
-    :param listener_req:
-    :param db
-    :return:
-    """
-    resp, err = listener_service.create_listener(db, listener_req)
+    resp, err = await listener_service.create_listener_async(db, listener_req)
 
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -108,7 +105,7 @@ async def update_listener(
         if err:
             raise HTTPException(status_code=400, detail=err)
 
-        resp, err = listener_service.start_existing_listener(db, resp)
+        resp, err = await listener_service.start_existing_listener_async(db, resp)
 
         if err:
             raise HTTPException(status_code=400, detail=err)
@@ -121,7 +118,19 @@ async def update_listener(
         )
     if not listener_req.enabled and db_listener.enabled:
         # disable and update
-        listener_service.stop_listener(db_listener)
+        try:
+            listener_service.stop_listener(db_listener)
+        except Exception as e:
+            log.error(
+                'Failed to stop listener "%s": %s',
+                db_listener.name,
+                e,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f'Failed to stop listener "{db_listener.name}": {e}',
+            ) from e
         resp, err = listener_service.update_listener(db, db_listener, listener_req)
 
         if err:

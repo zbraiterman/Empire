@@ -76,7 +76,7 @@ async def create_stager(
     stager_service: StagerServiceDep,
     save: bool = True,
 ):
-    resp, err = stager_service.create_stager(
+    resp, err = await stager_service.create_stager_async(
         db, stager_req, save, user_id=current_user.id
     )
 
@@ -94,7 +94,7 @@ async def update_stager(
     db_stager: StagerDep,
     stager_service: StagerServiceDep,
 ):
-    resp, err = stager_service.update_stager(db, db_stager, stager_req)
+    resp, err = await stager_service.update_stager_async(db, db_stager, stager_req)
 
     if err:
         raise HTTPException(status_code=400, detail=err)

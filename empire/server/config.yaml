@@ -12,6 +12,10 @@ database:
     username: empire_user
     password: empire_password
     database_name: empire
+    pool_size: 10
+    max_overflow: 15
+    pool_pre_ping: true
+    pool_recycle: 3600
   sqlite:
     location: empire.db
   defaults:

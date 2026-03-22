@@ -14,12 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+-   Added configurable MySQL connection pool settings (`pool_size`, `max_overflow`, `pool_pre_ping`, `pool_recycle`) via server config YAML
+-   Added pool health monitoring that warns at 80% capacity
+-   Added `mysql` pytest marker for tests requiring MySQL and Docker
+-   Added performance test suite (`empire/test/test_performance/`) for pool exhaustion and event loop blocking regression testing
+
+### Changed
+
+-   Agent check-in uses single INSERT with ON DUPLICATE KEY UPDATE / ON CONFLICT DO NOTHING instead of SELECT-then-INSERT (2 queries → 1)
+-   Stager creation, listener start, and plugin install are offloaded to threads via `asyncio.to_thread()` to avoid blocking the FastAPI event loop
+
+### Deprecated
+
+-   Sync service methods `create_stager`, `update_stager`, `create_listener`, `install_plugin_from_git`, `install_plugin_from_tar` now emit `DeprecationWarning`; use `_async` variants instead
+
 ### Removed
 
 -   Removed legacy `archive` field from `empire_compiler` config; use `repo` and `ref` instead
 
 ### Fixed
 
+-   Fixed DB pool exhaustion under concurrent load causing 503/504 cascading failures
+-   Fixed event loop blocking during stager compilation, listener start, and plugin install
 -   Fixed unnecessary GitHub API call on every server startup when the compiler is already cached locally
 
 ## [6.5.0] - 2026-03-08
