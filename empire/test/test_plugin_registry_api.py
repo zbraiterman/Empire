@@ -1,9 +1,14 @@
+import asyncio
+import inspect
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 from unittest.mock import ANY, AsyncMock
 
 import pytest
 from starlette import status
+
+from empire.server.core.db.base import SessionLocal
+from empire.server.core.plugin_registry_service import PluginRegistryService
 
 if TYPE_CHECKING:
     from empire.server.common.empire import MainMenu
@@ -163,3 +168,51 @@ def test_install_plugin_tar(client, admin_auth_header, plugin_service):
             "1.0.0",
             IsDict(),
         )
+
+
+def test_install_plugin_is_async():
+    """Guard against install_plugin regressing to a sync function.
+
+    PR #1211 made install_plugin async; the setup codepath in empire.py
+    depends on this so it can ``await`` the call via ``asyncio.run()``.
+    If someone accidentally removes the ``async``, the ``await`` in empire.py
+    will raise a TypeError and this test will also fail.
+    """
+    assert inspect.iscoroutinefunction(PluginRegistryService.install_plugin)
+
+
+def test_auto_install_awaits_install_plugin(plugin_registry_service, plugin_service):
+    """Simulate the setup auto-install loop and verify install_plugin is awaited.
+
+    This is a regression test for the bug where empire.py called the now-async
+    install_plugin() synchronously, producing a silently discarded coroutine.
+    """
+    mock_git = AsyncMock()
+    original_git = plugin_service.install_plugin_from_git_async
+    plugin_service.install_plugin_from_git_async = mock_git
+
+    try:
+        # Simulate what empire.py's _auto_install_plugins does:
+        # await main.pluginregistriesv2.install_plugin(db, name, version, registry)
+        with SessionLocal.begin() as db:
+            coro = plugin_registry_service.install_plugin(
+                db, "slack", "1.0.0", "BC-SECURITY"
+            )
+            # The return value MUST be a coroutine — if it's not, the
+            # setup code's ``await`` would raise TypeError.
+            assert inspect.iscoroutine(coro), (
+                "install_plugin() must return a coroutine; "
+                "setup auto-install depends on awaiting it"
+            )
+            asyncio.run(coro)
+
+        mock_git.assert_called_once_with(
+            ANY,
+            "https://github.com/bc-security/slack-plugin",
+            None,
+            "v1.0.0",
+            "1.0.0",
+            IsDict(),
+        )
+    finally:
+        plugin_service.install_plugin_from_git_async = original_git
