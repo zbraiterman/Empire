@@ -21,5 +21,5 @@ router = APIRouter(
     "/version",
     response_model=EmpireVersion,
 )
-async def read_empire_version():
+def read_empire_version():
     return {"version": empire.server.common.empire.VERSION.split(" ")[0]}

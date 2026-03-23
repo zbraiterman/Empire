@@ -31,7 +31,7 @@ def setup_socket_events(sio, empire_menu):  # noqa: PLR0915
     sid_to_user = {}
 
     async def get_user_from_token(sid, token, db: Session):
-        user = await jwt_auth.get_current_user_from_token(db, token)
+        user = jwt_auth.get_current_user_from_token(db, token)
         if user is None:
             return False
         sid_to_user[sid] = user.id

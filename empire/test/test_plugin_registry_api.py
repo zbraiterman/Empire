@@ -1,8 +1,7 @@
-import asyncio
 import inspect
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
-from unittest.mock import ANY, AsyncMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from starlette import status
@@ -95,13 +94,13 @@ def test_install_plugin_version_not_found(client, admin_auth_header):
 
 @contextmanager
 def patch_install_plugin_from_git(plugin_service):
-    mock = AsyncMock()
-    original = plugin_service.install_plugin_from_git_async
-    plugin_service.install_plugin_from_git_async = mock
+    mock = MagicMock()
+    original = plugin_service.install_plugin_from_git
+    plugin_service.install_plugin_from_git = mock
 
     yield mock
 
-    plugin_service.install_plugin_from_git_async = original
+    plugin_service.install_plugin_from_git = original
 
 
 class IsDict:
@@ -138,13 +137,13 @@ def test_install_plugin_git(client, admin_auth_header, plugin_service):
 
 @contextmanager
 def patch_install_plugin_from_tar(plugin_service):
-    mock = AsyncMock()
-    original = plugin_service.install_plugin_from_tar_async
-    plugin_service.install_plugin_from_tar_async = mock
+    mock = MagicMock()
+    original = plugin_service.install_plugin_from_tar
+    plugin_service.install_plugin_from_tar = mock
 
     yield mock
 
-    plugin_service.install_plugin_from_tar_async = original
+    plugin_service.install_plugin_from_tar = original
 
 
 def test_install_plugin_tar(client, admin_auth_header, plugin_service):
@@ -170,41 +169,25 @@ def test_install_plugin_tar(client, admin_auth_header, plugin_service):
         )
 
 
-def test_install_plugin_is_async():
-    """Guard against install_plugin regressing to a sync function.
+def test_install_plugin_is_sync():
+    """install_plugin must be a plain def, not async def.
 
-    PR #1211 made install_plugin async; the setup codepath in empire.py
-    depends on this so it can ``await`` the call via ``asyncio.run()``.
-    If someone accidentally removes the ``async``, the ``await`` in empire.py
-    will raise a TypeError and this test will also fail.
+    All Empire handlers now use def (not async def) so FastAPI dispatches
+    them to a thread pool.  install_plugin calls synchronous service
+    methods and should be sync too.
     """
-    assert inspect.iscoroutinefunction(PluginRegistryService.install_plugin)
+    assert not inspect.iscoroutinefunction(PluginRegistryService.install_plugin)
 
 
-def test_auto_install_awaits_install_plugin(plugin_registry_service, plugin_service):
-    """Simulate the setup auto-install loop and verify install_plugin is awaited.
-
-    This is a regression test for the bug where empire.py called the now-async
-    install_plugin() synchronously, producing a silently discarded coroutine.
-    """
-    mock_git = AsyncMock()
-    original_git = plugin_service.install_plugin_from_git_async
-    plugin_service.install_plugin_from_git_async = mock_git
+def test_install_plugin_calls_sync_service(plugin_registry_service, plugin_service):
+    """install_plugin must call the sync install_plugin_from_git method."""
+    mock_git = MagicMock()
+    original_git = plugin_service.install_plugin_from_git
+    plugin_service.install_plugin_from_git = mock_git
 
     try:
-        # Simulate what empire.py's _auto_install_plugins does:
-        # await main.pluginregistriesv2.install_plugin(db, name, version, registry)
         with SessionLocal.begin() as db:
-            coro = plugin_registry_service.install_plugin(
-                db, "slack", "1.0.0", "BC-SECURITY"
-            )
-            # The return value MUST be a coroutine — if it's not, the
-            # setup code's ``await`` would raise TypeError.
-            assert inspect.iscoroutine(coro), (
-                "install_plugin() must return a coroutine; "
-                "setup auto-install depends on awaiting it"
-            )
-            asyncio.run(coro)
+            plugin_registry_service.install_plugin(db, "slack", "1.0.0", "BC-SECURITY")
 
         mock_git.assert_called_once_with(
             ANY,
@@ -215,4 +198,4 @@ def test_auto_install_awaits_install_plugin(plugin_registry_service, plugin_serv
             IsDict(),
         )
     finally:
-        plugin_service.install_plugin_from_git_async = original_git
+        plugin_service.install_plugin_from_git = original_git

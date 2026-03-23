@@ -108,6 +108,10 @@ def _build_test_config(mysql_port: int, empire_port: int) -> str:
     config["database"]["mysql"]["username"] = MYSQL_USER
     config["database"]["mysql"]["password"] = MYSQL_PASSWORD
     config["database"]["mysql"]["database_name"] = MYSQL_DATABASE
+    # Use a small pool to catch connection leaks and amplification issues
+    # that would be hidden by the default 25-connection pool.
+    config["database"]["mysql"]["pool_size"] = 5
+    config["database"]["mysql"]["max_overflow"] = 3
     config["starkiller"]["enabled"] = False
     config["submodules"]["auto_update"] = False
     config["logging"]["level"] = "WARNING"

@@ -1,9 +1,7 @@
-import asyncio
 import copy
 import logging
 import typing
 import uuid
-import warnings
 from pathlib import Path
 from typing import Any
 
@@ -129,13 +127,13 @@ class StagerService:
         return db_stager, None
 
     def _validate_create(self, db, stager_req, save):
-        """Shared validation for create_stager / create_stager_async."""
+        """Shared validation for create_stager."""
         if save and self.get_by_name(db, stager_req.name):
             return None, f"Stager with name {stager_req.name} already exists."
         return self.validate_stager_options(db, stager_req.template, stager_req.options)
 
     def _validate_update(self, db, db_stager, stager_req):
-        """Shared validation for update_stager / update_stager_async."""
+        """Shared validation for update_stager."""
         if stager_req.name != db_stager.name:
             if not self.get_by_name(db, stager_req.name):
                 db_stager.name = stager_req.name
@@ -144,40 +142,11 @@ class StagerService:
         return self.validate_stager_options(db, db_stager.module, stager_req.options)
 
     def create_stager(self, db: Session, stager_req, save: bool, user_id: int):
-        """.. deprecated:: Use ``create_stager_async`` instead. Will be removed in 7.0."""
-        warnings.warn(
-            "create_stager() is deprecated, use create_stager_async()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         template_instance, err = self._validate_create(db, stager_req, save)
         if err:
             return None, err
 
         generated, err = self.generate_stager(template_instance)
-        if err:
-            return None, err
-
-        return self._persist_new_stager(
-            db, stager_req, template_instance, generated, user_id, save
-        )
-
-    async def create_stager_async(
-        self, db: Session, stager_req, save: bool, user_id: int
-    ):
-        """Like ``create_stager`` but offloads blocking generation to a thread."""
-        template_instance, err = self._validate_create(db, stager_req, save)
-        if err:
-            return None, err
-
-        try:
-            generated, err = await asyncio.to_thread(
-                self.generate_stager, template_instance
-            )
-        except Exception as e:
-            msg = f"Stager generation failed: {type(e).__name__}: {e}"
-            log.error(msg, exc_info=True)
-            return None, msg
         if err:
             return None, err
 
@@ -186,38 +155,11 @@ class StagerService:
         )
 
     def update_stager(self, db: Session, db_stager: models.Stager, stager_req):
-        """.. deprecated:: Use ``update_stager_async`` instead. Will be removed in 7.0."""
-        warnings.warn(
-            "update_stager() is deprecated, use update_stager_async()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         template_instance, err = self._validate_update(db, db_stager, stager_req)
         if err:
             return None, err
 
         generated, err = self.generate_stager(template_instance)
-        if err:
-            return None, err
-
-        return self._persist_updated_stager(db, db_stager, template_instance, generated)
-
-    async def update_stager_async(
-        self, db: Session, db_stager: models.Stager, stager_req
-    ):
-        """Like ``update_stager`` but offloads blocking generation to a thread."""
-        template_instance, err = self._validate_update(db, db_stager, stager_req)
-        if err:
-            return None, err
-
-        try:
-            generated, err = await asyncio.to_thread(
-                self.generate_stager, template_instance
-            )
-        except Exception as e:
-            msg = f"Stager generation failed: {type(e).__name__}: {e}"
-            log.error(msg, exc_info=True)
-            return None, msg
         if err:
             return None, err
 

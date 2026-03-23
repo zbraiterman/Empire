@@ -29,7 +29,7 @@ router = APIRouter(
 )
 
 
-async def get_host(uid: int, db: CurrentSession, host_service: HostServiceDep):
+def get_host(uid: int, db: CurrentSession, host_service: HostServiceDep):
     host = host_service.get_by_id(db, uid)
 
     if host:
@@ -42,12 +42,12 @@ HostDep = Annotated[models.Host, Depends(get_host)]
 
 
 @router.get("/{uid}", response_model=Host)
-async def read_host(uid: int, db_host: HostDep):
+def read_host(uid: int, db_host: HostDep):
     return domain_to_dto_host(db_host)
 
 
 @router.get("/", response_model=Hosts)
-async def read_hosts(db: CurrentSession, host_service: HostServiceDep):
+def read_hosts(db: CurrentSession, host_service: HostServiceDep):
     hosts = [domain_to_dto_host(x) for x in host_service.get_all(db)]
 
     return {"records": hosts}

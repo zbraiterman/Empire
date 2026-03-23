@@ -1,10 +1,8 @@
-import asyncio
 import copy
 import hashlib
 import logging
 import re
 import typing
-import warnings
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -143,7 +141,7 @@ class ListenerService:
         return None, f'Listener "{listener.name}" failed to start'
 
     def _validate_create(self, db, listener_req):
-        """Shared validation preamble for create_listener / create_listener_async."""
+        """Shared validation preamble for create_listener."""
         if self.get_by_name(db, listener_req.name):
             return None, f"Listener with name {listener_req.name} already exists."
 
@@ -162,12 +160,6 @@ class ListenerService:
         return self._finalize_created_listener(db, template_instance, db_listener)
 
     def create_listener(self, db: Session, listener_req):
-        """.. deprecated:: Use ``create_listener_async`` instead. Will be removed in 7.0."""
-        warnings.warn(
-            "create_listener() is deprecated, use create_listener_async()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         template_instance, err = self._validate_create(db, listener_req)
         if err:
             return None, err
@@ -176,25 +168,6 @@ class ListenerService:
         try:
             log.info(f"v2: Starting listener '{name}'")
             success = template_instance.start()
-        except Exception as e:
-            msg = f"Failed to start listener '{name}': {e}"
-            log.error(msg)
-            return None, msg
-
-        return self._finish_create(
-            db, template_instance, listener_req.template, success
-        )
-
-    async def create_listener_async(self, db: Session, listener_req):
-        """Like ``create_listener`` but offloads blocking start to a thread."""
-        template_instance, err = self._validate_create(db, listener_req)
-        if err:
-            return None, err
-
-        name = template_instance.options["Name"]["Value"]
-        try:
-            log.info(f"v2: Starting listener '{name}'")
-            success = await asyncio.to_thread(template_instance.start)
         except Exception as e:
             msg = f"Failed to start listener '{name}': {e}"
             log.error(msg)
@@ -218,7 +191,7 @@ class ListenerService:
             listener.shutdown()
 
     def _validate_existing(self, db, listener):
-        """Shared validation for start_existing_listener / start_existing_listener_async."""
+        """Shared validation for start_existing_listener."""
         listener.enabled = True
         options = {key: meta["Value"] for key, meta in listener.options.items()}
         template_instance, err = self._validate_listener_options(
@@ -229,31 +202,11 @@ class ListenerService:
         return template_instance, err
 
     def start_existing_listener(self, db: Session, listener: models.Listener):
-        """Also used at startup (sync) -- no deprecation warning."""
         template_instance, err = self._validate_existing(db, listener)
         if err:
             return None, err
 
         success = template_instance.start()
-        return self._finalize_existing_listener(
-            db, listener, template_instance, success
-        )
-
-    async def start_existing_listener_async(
-        self, db: Session, listener: models.Listener
-    ):
-        """Like ``start_existing_listener`` but offloads blocking start to a thread."""
-        template_instance, err = self._validate_existing(db, listener)
-        if err:
-            return None, err
-
-        try:
-            success = await asyncio.to_thread(template_instance.start)
-        except Exception as e:
-            msg = f'Failed to start listener "{listener.name}": {e}'
-            log.error(msg)
-            return None, msg
-
         return self._finalize_existing_listener(
             db, listener, template_instance, success
         )

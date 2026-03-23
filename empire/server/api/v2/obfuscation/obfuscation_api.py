@@ -49,7 +49,7 @@ router = APIRouter(
 )
 
 
-async def get_keyword(
+def get_keyword(
     uid: int,
     db: CurrentSession,
     obfuscation_service: ObfuscationServiceDep,
@@ -66,12 +66,12 @@ KeywordDep = Annotated[models.Keyword, Depends(get_keyword)]
 
 
 @router.get("/keywords/{uid}", response_model=Keyword)
-async def read_keyword(uid: int, db_keyword: KeywordDep):
+def read_keyword(uid: int, db_keyword: KeywordDep):
     return db_keyword
 
 
 @router.get("/keywords", response_model=Keywords)
-async def read_keywords(
+def read_keywords(
     db: CurrentSession,
     obfuscation_service: ObfuscationServiceDep,
 ):
@@ -80,7 +80,7 @@ async def read_keywords(
 
 
 @router.post("/keywords", response_model=Keyword, status_code=201)
-async def create_keyword(
+def create_keyword(
     keyword_req: KeywordPostRequest,
     db: CurrentSession,
     obfuscation_service: ObfuscationServiceDep,
@@ -94,7 +94,7 @@ async def create_keyword(
 
 
 @router.put("/keywords/{uid}", response_model=Keyword)
-async def update_keyword(
+def update_keyword(
     uid: int,
     keyword_req: KeywordUpdateRequest,
     db: CurrentSession,
@@ -113,7 +113,7 @@ async def update_keyword(
     "/keywords/{uid}",
     status_code=HTTP_204_NO_CONTENT,
 )
-async def delete_keyword(
+def delete_keyword(
     uid: str,
     db: CurrentSession,
     db_keyword: KeywordDep,
@@ -122,7 +122,7 @@ async def delete_keyword(
     obfuscation_service.delete_keyword(db, db_keyword)
 
 
-async def get_obfuscation_config(
+def get_obfuscation_config(
     language: str,
     db: CurrentSession,
     obfuscation_service: ObfuscationServiceDep,
@@ -144,7 +144,7 @@ ObfuscationConfigDep = Annotated[
 
 
 @router.get("/global", response_model=ObfuscationConfigs)
-async def read_obfuscation_configs(
+def read_obfuscation_configs(
     db: CurrentSession,
     obfuscation_service: ObfuscationServiceDep,
 ):
@@ -154,7 +154,7 @@ async def read_obfuscation_configs(
 
 
 @router.get("/global/{language}", response_model=ObfuscationConfig)
-async def read_obfuscation_config(
+def read_obfuscation_config(
     language: str,
     db_obf_config: ObfuscationConfigDep,
 ):
@@ -162,7 +162,7 @@ async def read_obfuscation_config(
 
 
 @router.put("/global/{language}", response_model=ObfuscationConfig)
-async def update_obfuscation_config(
+def update_obfuscation_config(
     language: str,
     obf_req: ObfuscationConfigUpdateRequest,
     db: CurrentSession,
@@ -184,7 +184,7 @@ async def update_obfuscation_config(
     status_code=HTTP_202_ACCEPTED,
     response_class=Response,
 )
-async def preobfuscate_modules(
+def preobfuscate_modules(
     language: str,
     background_tasks: BackgroundTasks,
     db: CurrentSession,
@@ -208,7 +208,7 @@ async def preobfuscate_modules(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def remove_preobfuscated_modules(
+def remove_preobfuscated_modules(
     language: str,
     db_obf_config: ObfuscationConfigDep,
     module_service: ModuleServiceDep,

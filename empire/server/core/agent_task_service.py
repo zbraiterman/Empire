@@ -508,7 +508,9 @@ class AgentTaskService:
                 location.parent.mkdir(parents=True, exist_ok=True)
                 location.write_text(task_input)
 
-        hooks.run_hooks(hooks.AFTER_TASKING_HOOK, db, task)
+        db.expunge(task)
+        hooks.run_hooks(hooks.AFTER_TASKING_HOOK, None, task)
+        db.add(task)
 
         message = f"Agent {agent.session_id} tasked with task ID {pk}"
         log.info(message)

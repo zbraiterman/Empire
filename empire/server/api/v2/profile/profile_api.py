@@ -36,7 +36,7 @@ router = APIRouter(
 )
 
 
-async def get_profile(
+def get_profile(
     uid: int,
     db: CurrentSession,
     profile_service: ProfileServiceDep,
@@ -53,12 +53,12 @@ ProfileDep = Annotated[models.Profile, Depends(get_profile)]
 
 
 @router.get("/{uid}", response_model=Profile)
-async def read_profile(uid: int, db_profile: ProfileDep):
+def read_profile(uid: int, db_profile: ProfileDep):
     return db_profile
 
 
 @router.get("/", response_model=Profiles)
-async def read_profiles(db: CurrentSession, profile_service: ProfileServiceDep):
+def read_profiles(db: CurrentSession, profile_service: ProfileServiceDep):
     profiles = profile_service.get_all(db)
 
     return {"records": profiles}
@@ -69,7 +69,7 @@ async def read_profiles(db: CurrentSession, profile_service: ProfileServiceDep):
     status_code=201,
     response_model=Profile,
 )
-async def create_profile(
+def create_profile(
     profile_req: ProfilePostRequest,
     db: CurrentSession,
     profile_service: ProfileServiceDep,
@@ -83,7 +83,7 @@ async def create_profile(
 
 
 @router.put("/{uid}", response_model=Profile)
-async def update_profile(
+def update_profile(
     uid: int,
     profile_req: ProfileUpdateRequest,
     db: CurrentSession,
@@ -103,7 +103,7 @@ async def update_profile(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def delete_profile(
+def delete_profile(
     uid: str,
     db: CurrentSession,
     db_profile: ProfileDep,
@@ -117,7 +117,7 @@ async def delete_profile(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def reload_profiles(
+def reload_profiles(
     db: CurrentSession,
     profile_service: ProfileServiceDep,
 ):
@@ -129,7 +129,7 @@ async def reload_profiles(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def reset_profiles(
+def reset_profiles(
     db: CurrentSession,
     profile_service: ProfileServiceDep,
 ):

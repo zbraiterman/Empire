@@ -103,7 +103,7 @@ def test_concurrent_db_requests_no_pool_exhaustion(
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("concurrency", [10, 25, 50])
+@pytest.mark.parametrize("concurrency", [50, 100, 250])
 def test_pool_exhaustion_at_concurrency_levels(
     empire_base_url: str,
     auth_header: dict[str, str],

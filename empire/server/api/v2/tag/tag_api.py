@@ -43,7 +43,7 @@ router = APIRouter(
 
 
 @router.get("/")
-async def get_tags(
+def get_tags(
     db: CurrentSession,
     tag_service: TagServiceDep,
     limit: int = -1,
@@ -75,7 +75,7 @@ async def get_tags(
 
 
 def add_endpoints_to_taggable(router, path, get_taggable):
-    async def get_tag(
+    def get_tag(
         tag_id: int,
         db: CurrentSession,
         tag_service: TagServiceDep,
@@ -89,7 +89,7 @@ def add_endpoints_to_taggable(router, path, get_taggable):
 
     TagDep = Annotated[models.Tag, Depends(get_tag)]
 
-    async def add_tag(
+    def add_tag(
         uid: int | str,
         tag_req: TagRequest,
         db: CurrentSession,
@@ -102,7 +102,7 @@ def add_endpoints_to_taggable(router, path, get_taggable):
 
         return domain_to_dto_tag(tag)
 
-    async def update_tag(
+    def update_tag(
         uid: int | str,
         tag_req: TagRequest,
         db: CurrentSession,
@@ -114,7 +114,7 @@ def add_endpoints_to_taggable(router, path, get_taggable):
 
         return domain_to_dto_tag(tag)
 
-    async def delete_tag(
+    def delete_tag(
         uid: int | str,
         tag_id: int,
         db: CurrentSession,

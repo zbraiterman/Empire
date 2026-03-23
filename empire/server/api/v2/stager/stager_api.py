@@ -37,7 +37,7 @@ router = APIRouter(
 )
 
 
-async def get_stager(
+def get_stager(
     uid: int,
     db: CurrentSession,
     stager_service: StagerServiceDep,
@@ -54,7 +54,7 @@ StagerDep = Annotated[models.Stager, Depends(get_stager)]
 
 
 @router.get("/", response_model=Stagers)
-async def read_stagers(
+def read_stagers(
     db: CurrentSession,
     stager_service: StagerServiceDep,
 ):
@@ -64,19 +64,19 @@ async def read_stagers(
 
 
 @router.get("/{uid}", response_model=Stager)
-async def read_stager(uid: int, db_stager: StagerDep):
+def read_stager(uid: int, db_stager: StagerDep):
     return domain_to_dto_stager(db_stager)
 
 
 @router.post("/", status_code=201, response_model=Stager)
-async def create_stager(
+def create_stager(
     stager_req: StagerPostRequest,
     current_user: CurrentActiveUser,
     db: CurrentSession,
     stager_service: StagerServiceDep,
     save: bool = True,
 ):
-    resp, err = await stager_service.create_stager_async(
+    resp, err = stager_service.create_stager(
         db, stager_req, save, user_id=current_user.id
     )
 
@@ -87,14 +87,14 @@ async def create_stager(
 
 
 @router.put("/{uid}", response_model=Stager)
-async def update_stager(
+def update_stager(
     uid: int,
     stager_req: StagerUpdateRequest,
     db: CurrentSession,
     db_stager: StagerDep,
     stager_service: StagerServiceDep,
 ):
-    resp, err = await stager_service.update_stager_async(db, db_stager, stager_req)
+    resp, err = stager_service.update_stager(db, db_stager, stager_req)
 
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -107,7 +107,7 @@ async def update_stager(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def delete_stager(
+def delete_stager(
     uid: int,
     db: CurrentSession,
     db_stager: StagerDep,

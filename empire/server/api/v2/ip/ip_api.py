@@ -34,7 +34,7 @@ router = APIRouter(
 )
 
 
-async def get_ip(uid: int, db: CurrentSession, ip_service: IpServiceDep):
+def get_ip(uid: int, db: CurrentSession, ip_service: IpServiceDep):
     ip = ip_service.get_by_id(db, uid)
 
     if ip:
@@ -47,12 +47,12 @@ IpDep = Annotated[models.IP, Depends(get_ip)]
 
 
 @router.get("/{uid}", response_model=IP)
-async def read_ip(uid: int, db_ip: IpDep):
+def read_ip(uid: int, db_ip: IpDep):
     return domain_to_dto_ip(db_ip)
 
 
 @router.get("/", response_model=Ips)
-async def read_ips(
+def read_ips(
     db: CurrentSession,
     ip_list: IpList = None,
     *,
@@ -69,7 +69,7 @@ async def read_ips(
     status_code=201,
     dependencies=[Depends(get_current_active_admin_user)],
 )
-async def create_ip(
+def create_ip(
     ip: IpPostRequest,
     db: CurrentSession,
     ip_service: IpServiceDep,
@@ -84,7 +84,7 @@ async def create_ip(
     status_code=204,
     dependencies=[Depends(get_current_active_admin_user)],
 )
-async def delete_ip(
+def delete_ip(
     uid: int,
     db: CurrentSession,
     db_ip: IpDep,

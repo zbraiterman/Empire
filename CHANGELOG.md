@@ -24,11 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 -   Agent check-in uses single INSERT with ON DUPLICATE KEY UPDATE / ON CONFLICT DO NOTHING instead of SELECT-then-INSERT (2 queries → 1)
--   Stager creation, listener start, and plugin install are offloaded to threads via `asyncio.to_thread()` to avoid blocking the FastAPI event loop
-
-### Deprecated
-
--   Sync service methods `create_stager`, `update_stager`, `create_listener`, `install_plugin_from_git`, `install_plugin_from_tar` now emit `DeprecationWarning`; use `_async` variants instead
+-   All FastAPI route handlers converted from `async def` to `def`. FastAPI now dispatches every handler to a thread pool, preventing synchronous SQLAlchemy calls from blocking the uvicorn event loop. Handlers that previously offloaded work via `asyncio.to_thread()` no longer need to — the thread pool provides the same isolation automatically.
+-   High-frequency hooks (`AFTER_AGENT_CALLBACK_HOOK`, `AFTER_TASKING_RESULT_HOOK`, `AFTER_AGENT_CHECKIN_HOOK`, `AFTER_TASKING_HOOK`) now fire with `None` as the session argument. `_run_async_hook` and `run_hooks` provide a fresh managed session to hook callbacks, eliminating the 2x connection amplification that occurred when hooks opened a second connection while the caller still held the first.
 
 ### Removed
 
@@ -36,8 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
--   Fixed DB pool exhaustion under concurrent load causing 503/504 cascading failures
--   Fixed event loop blocking during stager compilation, listener start, and plugin install
+-   Fixed DB pool exhaustion under concurrent load causing 503/504 cascading failures. The root cause was hook connection amplification: async hooks called inside DB session blocks opened a second pool connection via `_run_async_hook` while the caller still held the first, doubling connection usage per check-in.
+-   Fixed event loop blocking across all API endpoints. Previously only stager, listener, and plugin endpoints were addressed; now all 216 handlers use `def` to prevent any synchronous DB call from blocking the event loop.
 -   Fixed unnecessary GitHub API call on every server startup when the compiler is already cached locally
 -   Fixed unhandled `TagInvalidException` in `parse_routing_packet` that caused request crashes from stale agents or non-agent traffic
 -   Fixed `TypeError` in BOF module parameter packing when integer values were passed to options that require space-checking

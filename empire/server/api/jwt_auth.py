@@ -90,7 +90,7 @@ def get_token_from_headers(request: Request) -> str:
     )
 
 
-async def get_current_user_from_token(
+def get_current_user_from_token(
     db: CurrentSession,
     token: str,
 ):
@@ -117,18 +117,18 @@ async def get_current_user_from_token(
     return user
 
 
-async def get_current_user(
+def get_current_user(
     db: CurrentSession,
     request: Request,
 ):
     token = get_token_from_headers(request)
-    return await get_current_user_from_token(db, token)
+    return get_current_user_from_token(db, token)
 
 
 CurrentUser = Annotated[models.User, Depends(get_current_user)]
 
 
-async def get_current_active_user(
+def get_current_active_user(
     current_user: CurrentUser,
 ):
     if not current_user.enabled:
@@ -139,7 +139,7 @@ async def get_current_active_user(
 CurrentActiveUser = Annotated[models.User, Depends(get_current_active_user)]
 
 
-async def get_current_active_admin_user(
+def get_current_active_admin_user(
     current_user: CurrentUser,
 ):
     if not current_user.enabled:

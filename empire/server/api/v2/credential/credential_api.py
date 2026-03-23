@@ -39,7 +39,7 @@ router = APIRouter(
 )
 
 
-async def get_credential(
+def get_credential(
     uid: int,
     db: CurrentSession,
     credential_service: CredentialServiceDep,
@@ -59,12 +59,12 @@ tag_api.add_endpoints_to_taggable(router, "/{uid}/tags", get_credential)
 
 
 @router.get("/{uid}", response_model=Credential)
-async def read_credential(uid: int, db_credential: CredentialDep):
+def read_credential(uid: int, db_credential: CredentialDep):
     return domain_to_dto_credential(db_credential)
 
 
 @router.get("/", response_model=Credentials)
-async def read_credentials(
+def read_credentials(
     db: CurrentSession,
     credential_service: CredentialServiceDep,
     search: str | None = None,
@@ -84,7 +84,7 @@ async def read_credentials(
     status_code=201,
     response_model=Credential,
 )
-async def create_credential(
+def create_credential(
     credential_req: CredentialPostRequest,
     db: CurrentSession,
     credential_service: CredentialServiceDep,
@@ -98,7 +98,7 @@ async def create_credential(
 
 
 @router.put("/{uid}", response_model=Credential)
-async def update_credential(
+def update_credential(
     uid: int,
     credential_req: CredentialUpdateRequest,
     db: CurrentSession,
@@ -118,7 +118,7 @@ async def update_credential(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def delete_credential(
+def delete_credential(
     uid: str,
     db: CurrentSession,
     db_credential: CredentialDep,

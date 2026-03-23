@@ -42,7 +42,7 @@ router = APIRouter(
 
 
 @router.get("/marketplace", response_model=MarketplaceResponse)
-async def get_marketplace(
+def get_marketplace(
     db: CurrentSession,
     plugin_registry_service: PluginRegistryServiceDep,
 ):
@@ -52,13 +52,13 @@ async def get_marketplace(
 
 
 @router.post("/marketplace/install")
-async def install_plugin(
+def install_plugin(
     install_req: PluginInstallRequest,
     db: CurrentSession,
     plugin_registry_service: PluginRegistryServiceDep,
 ):
     try:
-        await plugin_registry_service.install_plugin(
+        plugin_registry_service.install_plugin(
             db, install_req.name, install_req.version, install_req.registry
         )
     except PluginValidationException as e:

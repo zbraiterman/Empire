@@ -42,7 +42,7 @@ router = APIRouter(
 )
 
 
-async def get_listener(
+def get_listener(
     uid: int,
     db: CurrentSession,
     listener_service: ListenerServiceDep,
@@ -62,12 +62,12 @@ tag_api.add_endpoints_to_taggable(router, "/{uid}/tags", get_listener)
 
 
 @router.get("/{uid}", response_model=Listener)
-async def read_listener(uid: int, db_listener: ListenerDep):
+def read_listener(uid: int, db_listener: ListenerDep):
     return domain_to_dto_listener(db_listener)
 
 
 @router.get("/", response_model=Listeners)
-async def read_listeners(
+def read_listeners(
     db: CurrentSession,
     listener_service: ListenerServiceDep,
 ):
@@ -77,12 +77,12 @@ async def read_listeners(
 
 
 @router.post("/", status_code=201, response_model=Listener)
-async def create_listener(
+def create_listener(
     listener_req: ListenerPostRequest,
     db: CurrentSession,
     listener_service: ListenerServiceDep,
 ):
-    resp, err = await listener_service.create_listener_async(db, listener_req)
+    resp, err = listener_service.create_listener(db, listener_req)
 
     if err:
         raise HTTPException(status_code=400, detail=err)
@@ -91,7 +91,7 @@ async def create_listener(
 
 
 @router.put("/{uid}", response_model=Listener)
-async def update_listener(
+def update_listener(
     uid: int,
     listener_req: ListenerUpdateRequest,
     db: CurrentSession,
@@ -105,7 +105,7 @@ async def update_listener(
         if err:
             raise HTTPException(status_code=400, detail=err)
 
-        resp, err = await listener_service.start_existing_listener_async(db, resp)
+        resp, err = listener_service.start_existing_listener(db, resp)
 
         if err:
             raise HTTPException(status_code=400, detail=err)
@@ -154,7 +154,7 @@ async def update_listener(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def delete_listener(
+def delete_listener(
     uid: int,
     db: CurrentSession,
     db_listener: ListenerDep,
@@ -164,7 +164,7 @@ async def delete_listener(
 
 
 @router.put("/{uid}/autorun", response_model=Listener)
-async def update_listener_autorun(
+def update_listener_autorun(
     uid: int,
     autorun_config: AutorunConfig,
     db: CurrentSession,
@@ -178,7 +178,7 @@ async def update_listener_autorun(
 
 
 @router.get("/{uid}/autorun", response_model=AutorunConfig)
-async def get_listener_autorun(
+def get_listener_autorun(
     uid: int,
     db_listener: ListenerDep,
 ):

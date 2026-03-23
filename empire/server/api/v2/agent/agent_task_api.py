@@ -84,7 +84,7 @@ router = APIRouter(
 )
 
 
-async def get_agent(
+def get_agent(
     agent_id: str,
     db: CurrentSession,
     agent_service: AgentServiceDep,
@@ -100,7 +100,7 @@ async def get_agent(
 AgentDep = Annotated[models.Agent, Depends(get_agent)]
 
 
-async def get_task(
+def get_task(
     uid: int,
     db: CurrentSession,
     db_agent: AgentDep,
@@ -123,7 +123,7 @@ tag_api.add_endpoints_to_taggable(router, "/{agent_id}/tasks/{uid}/tags", get_ta
 
 
 @router.get("/tasks", response_model=AgentTasks)
-async def read_tasks_all_agents(
+def read_tasks_all_agents(
     db: CurrentSession,
     limit: int = -1,
     page: int = 1,
@@ -175,7 +175,7 @@ async def read_tasks_all_agents(
 
 
 @router.get("/{agent_id}/tasks", response_model=AgentTasks)
-async def read_tasks(
+def read_tasks(
     db: CurrentSession,
     db_agent: AgentDep,
     agent_task_service: AgentTaskServiceDep,
@@ -226,7 +226,7 @@ async def read_tasks(
 
 
 @router.get("/{agent_id}/tasks/{uid}", response_model=AgentTask)
-async def read_task(
+def read_task(
     uid: int,
     db: CurrentSession,
     db_agent: AgentDep,
@@ -239,7 +239,7 @@ async def read_task(
 
 
 @router.post("/{agent_id}/tasks/jobs", response_model=AgentTask)
-async def create_task_jobs(
+def create_task_jobs(
     db: CurrentSession,
     current_user: CurrentUser,
     db_agent: AgentDep,
@@ -251,7 +251,7 @@ async def create_task_jobs(
 
 
 @router.post("/{agent_id}/tasks/kill_job", response_model=AgentTask)
-async def create_task_kill_job(
+def create_task_kill_job(
     jobs: KillJobPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -267,7 +267,7 @@ async def create_task_kill_job(
 
 
 @router.post("/{agent_id}/tasks/stop_job", response_model=AgentTask)
-async def create_task_stop_job(
+def create_task_stop_job(
     jobs: StopJobPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -283,7 +283,7 @@ async def create_task_stop_job(
 
 
 @router.post("/{agent_id}/tasks/shell", status_code=201, response_model=AgentTask)
-async def create_task_shell(
+def create_task_shell(
     shell_request: ShellPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -305,7 +305,7 @@ async def create_task_shell(
 
 
 @router.post("/{agent_id}/tasks/module", status_code=201, response_model=AgentTask)
-async def create_task_module(
+def create_task_module(
     module_request: ModulePostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -336,7 +336,7 @@ async def create_task_module(
 
 
 @router.post("/{agent_id}/tasks/upload", status_code=201, response_model=AgentTask)
-async def create_task_upload(
+def create_task_upload(
     upload_request: UploadPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -376,7 +376,7 @@ async def create_task_upload(
 
 
 @router.post("/{agent_id}/tasks/download", status_code=201, response_model=AgentTask)
-async def create_task_download(
+def create_task_download(
     download_request: DownloadPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -394,7 +394,7 @@ async def create_task_download(
 
 
 @router.post("/{agent_id}/tasks/sysinfo", status_code=201, response_model=AgentTask)
-async def create_task_sysinfo(
+def create_task_sysinfo(
     sysinfo_request: SysinfoPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -412,7 +412,7 @@ async def create_task_sysinfo(
 @router.post(
     "/{agent_id}/tasks/update_comms", status_code=201, response_model=AgentTask
 )
-async def create_task_update_comms(
+def create_task_update_comms(
     comms_request: CommsPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -430,7 +430,7 @@ async def create_task_update_comms(
 
 
 @router.post("/{agent_id}/tasks/sleep", status_code=201, response_model=AgentTask)
-async def create_task_update_sleep(
+def create_task_update_sleep(
     sleep_request: SleepPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -448,7 +448,7 @@ async def create_task_update_sleep(
 
 
 @router.post("/{agent_id}/tasks/kill_date", status_code=201, response_model=AgentTask)
-async def create_task_update_kill_date(
+def create_task_update_kill_date(
     kill_date_request: KillDatePostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -468,7 +468,7 @@ async def create_task_update_kill_date(
 @router.post(
     "/{agent_id}/tasks/working_hours", status_code=201, response_model=AgentTask
 )
-async def create_task_update_working_hours(
+def create_task_update_working_hours(
     working_hours_request: WorkingHoursPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -488,7 +488,7 @@ async def create_task_update_working_hours(
 @router.post(
     "/{agent_id}/tasks/directory_list", status_code=201, response_model=AgentTask
 )
-async def create_task_update_directory_list(
+def create_task_update_directory_list(
     directory_list_request: DirectoryListPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -506,7 +506,7 @@ async def create_task_update_directory_list(
 
 
 @router.post("/{agent_id}/tasks/exit", status_code=201, response_model=AgentTask)
-async def create_task_exit(
+def create_task_exit(
     exit_request: ExitPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,
@@ -524,7 +524,7 @@ async def create_task_exit(
 @router.delete(
     "/{agent_id}/tasks/{uid}", status_code=HTTP_204_NO_CONTENT, response_class=Response
 )
-async def delete_task(
+def delete_task(
     uid: int,
     db: CurrentSession,
     db_task: TaskDep,
@@ -539,7 +539,7 @@ async def delete_task(
 
 
 @router.post("/{agent_id}/tasks/socks", status_code=201, response_model=AgentTask)
-async def create_task_socks(
+def create_task_socks(
     socks: SocksPostRequest,
     db: CurrentSession,
     current_user: CurrentUser,

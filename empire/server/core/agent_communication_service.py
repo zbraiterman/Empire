@@ -826,10 +826,12 @@ class AgentCommunicationService:
             message = f"Initial agent {session_id} from {client_ip} now active"
             log.info(message)
 
+            agent_obj = self.agent_service.get_by_id(db, session_id)
+            db.expunge(agent_obj)
             hooks.run_hooks(
                 hooks.AFTER_AGENT_CHECKIN_HOOK,
-                db,
-                self.agent_service.get_by_id(db, session_id),
+                None,
+                agent_obj,
             )
 
             # save the initial sysinfo information in the agent log
@@ -961,14 +963,14 @@ class AgentCommunicationService:
             return None
 
         # Phase 1: DB work only — release the connection ASAP
+        fire_callback_hook = False
         with SessionLocal.begin() as db:
             self.agent_service.update_agent_lastseen(db, session_id)
 
             # Check if the agent has returned sysinfo yet, so that we don't
             # send out a checkin before stage2 of registration is complete
             if self.agent_service.get_by_id(db, session_id).hostname:
-                # Call the hook to emit a checkin event
-                hooks.run_hooks(hooks.AFTER_AGENT_CALLBACK_HOOK, db, session_id)
+                fire_callback_hook = True
 
             tasks = self._get_queued_agent_tasks(db, session_id)
             temp_tasks = self._get_queued_agent_temporary_tasks(session_id)
@@ -979,6 +981,11 @@ class AgentCommunicationService:
             # accessible after the session closes.
             db.flush()
             db.expunge_all()
+
+        # Fire callback hook AFTER closing the session to avoid holding
+        # two pool connections simultaneously.
+        if fire_callback_hook:
+            hooks.run_hooks(hooks.AFTER_AGENT_CALLBACK_HOOK, None, session_id)
 
         # Phase 2: file I/O, encryption, packet building (no DB needed)
         if not tasks:
@@ -1055,9 +1062,16 @@ class AgentCommunicationService:
                     if update_lastseen:
                         self.agent_service.update_agent_lastseen(db, session_id)
 
-                    self._process_agent_packet(
+                    tasking = self._process_agent_packet(
                         db, session_id, responseName, taskID, data
                     )
+                    db.flush()
+                    if tasking is not None:
+                        db.expunge(tasking)
+
+                # Fire AFTER_TASKING_RESULT_HOOK outside the session block
+                if tasking is not None:
+                    hooks.run_hooks(hooks.AFTER_TASKING_RESULT_HOOK, None, tasking)
                 results = True
             if results:
                 # signal that this agent returned results
@@ -1279,7 +1293,7 @@ class AgentCommunicationService:
 
         elif response_name == "TASK_SOCKS_DATA":
             self.agent_socks_service.queue_socks_data(agent, base64.b64decode(data))
-            return
+            return None
 
         elif response_name == "TASK_DOWNLOAD":
             # file download
@@ -1406,7 +1420,7 @@ class AgentCommunicationService:
             )
 
             if final_save_path is None:
-                return
+                return None
 
             # update the agent log
             msg = f"Output saved to .{final_save_path}"
@@ -1433,7 +1447,7 @@ class AgentCommunicationService:
                 save_path = download_dir / session_id / "keystrokes.txt"
 
                 if not self._is_path_safe(save_path, download_dir, session_id):
-                    return
+                    return None
 
                 with save_path.open("a+") as f:
                     if isinstance(data, bytes):
@@ -1543,7 +1557,7 @@ class AgentCommunicationService:
         else:
             log.warning(f"Unknown response {response_name} from {session_id}")
 
-        hooks.run_hooks(hooks.AFTER_TASKING_RESULT_HOOK, db, tasking)
+        return tasking
 
     def autorun_tasks(self, db: Session, session_id):
         agent = (
