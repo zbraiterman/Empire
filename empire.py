@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-import asyncio
 import logging
 import sys
 
@@ -20,11 +19,11 @@ from empire.server.server import run
 log = logging.getLogger(__name__)
 
 
-async def _auto_install_plugins(main, auto_install):
+def _auto_install_plugins(main, auto_install):
     with SessionLocal.begin() as db:
         for entry in auto_install:
             try:
-                await main.pluginregistriesv2.install_plugin(
+                main.pluginregistriesv2.install_plugin(
                     db, entry.name, entry.version, entry.registry
                 )
                 log.info(
@@ -55,7 +54,7 @@ if __name__ == "__main__":
             base.startup_db()
             main = empire.MainMenu(args=args)
 
-            asyncio.run(_auto_install_plugins(main, auto_install))
+            _auto_install_plugins(main, auto_install)
 
             main.shutdown()
 
