@@ -21,7 +21,7 @@ def domain_to_dto_template(listener, uid: str):
             "strict": x[1]["Strict"],
             "suggested_values": x[1]["SuggestedValues"],
             "value_type": to_value_type(x[1]["Value"], x[1].get("Type")),
-            "depends_on": x[1]["Depends_on"] if x[1]["Depends_on"] is not None else [],
+            "depends_on": x[1]["DependsOn"] if x[1]["DependsOn"] is not None else [],
             "internal": x[1]["Internal"] if x[1]["Internal"] is not None else False,
         }
         for x in listener.options.items()
@@ -101,7 +101,7 @@ class ListenerTemplate(BaseModel):
                         "value": "http",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "Host": {
@@ -110,7 +110,7 @@ class ListenerTemplate(BaseModel):
                         "value": "http://192.168.0.20",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "BindIP": {
@@ -119,7 +119,7 @@ class ListenerTemplate(BaseModel):
                         "value": "0.0.0.0",
                         "suggested_values": ["0.0.0.0"],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "Port": {
@@ -128,7 +128,7 @@ class ListenerTemplate(BaseModel):
                         "value": "",
                         "suggested_values": ["1335", "1336"],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "Launcher": {
@@ -137,7 +137,7 @@ class ListenerTemplate(BaseModel):
                         "value": "powershell -noP -sta -w 1 -enc ",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "StagingKey": {
@@ -146,7 +146,7 @@ class ListenerTemplate(BaseModel):
                         "value": "}q)jFnDKw&px/7QBhE9Y<6~[Z1>{+Ps@",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "DefaultDelay": {
@@ -155,7 +155,7 @@ class ListenerTemplate(BaseModel):
                         "value": "5",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "DefaultJitter": {
@@ -164,7 +164,7 @@ class ListenerTemplate(BaseModel):
                         "value": "0.0",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "DefaultLostLimit": {
@@ -173,7 +173,7 @@ class ListenerTemplate(BaseModel):
                         "value": "60",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "DefaultProfile": {
@@ -182,7 +182,7 @@ class ListenerTemplate(BaseModel):
                         "value": "/admin/get.php,/news.php,/login/process.php|Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "CertPath": {
@@ -191,7 +191,7 @@ class ListenerTemplate(BaseModel):
                         "value": "",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "KillDate": {
@@ -200,7 +200,7 @@ class ListenerTemplate(BaseModel):
                         "value": "",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "WorkingHours": {
@@ -209,7 +209,7 @@ class ListenerTemplate(BaseModel):
                         "value": "",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "Headers": {
@@ -218,7 +218,7 @@ class ListenerTemplate(BaseModel):
                         "value": "Server:Microsoft-IIS/7.5",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "Cookie": {
@@ -227,7 +227,7 @@ class ListenerTemplate(BaseModel):
                         "value": "xNQsvLdAysjkonT",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "UserAgent": {
@@ -236,7 +236,7 @@ class ListenerTemplate(BaseModel):
                         "value": "default",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "Proxy": {
@@ -245,7 +245,7 @@ class ListenerTemplate(BaseModel):
                         "value": "default",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                     "ProxyCreds": {
@@ -254,7 +254,7 @@ class ListenerTemplate(BaseModel):
                         "value": "default",
                         "suggested_values": [],
                         "strict": False,
-                        "depends_on:": [],
+                        "depends_on": [],
                         "internal": False,
                     },
                 },

@@ -62,6 +62,12 @@ def validate_options(  # noqa: PLR0912
             continue
 
         if not evaluate_dependencies(option_meta, params):
+            # Dependencies not met: include with default value but skip validation
+            default_value = option_meta.get("Value", "")
+            if option_meta.get("NameInCode"):
+                options[option_meta["NameInCode"]] = default_value
+            else:
+                options[instance_key] = default_value
             continue
 
         if option_meta.get("Editable", True) is False:
@@ -91,9 +97,11 @@ def validate_options(  # noqa: PLR0912
                 options[instance_key] = ""
             continue
 
-        if option_meta.get("Strict") and params.get(
-            instance_key, ""
-        ) not in option_meta.get("SuggestedValues"):
+        if (
+            option_meta.get("Strict")
+            and option_meta.get("SuggestedValues") is not None
+            and params.get(instance_key, "") not in option_meta.get("SuggestedValues")
+        ):
             return (
                 None,
                 f"{instance_key} must be set to one of the suggested values.",
@@ -146,10 +154,10 @@ def evaluate_dependencies(option, params):
     :param params: The current parameters provided by the user.
     :return: Boolean indicating if the dependencies are met.
     """
-    if "depends_on" not in option:
+    if "DependsOn" not in option or not option["DependsOn"]:
         return True
 
-    for dependency in option["depends_on"]:
+    for dependency in option["DependsOn"]:
         dependent_option = dependency["name"]
         if dependent_option not in params:
             return False

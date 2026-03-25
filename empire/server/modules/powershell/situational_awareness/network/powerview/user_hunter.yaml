@@ -84,10 +84,14 @@ options:
     required: false
     value: ''
   - name: UserAllowDelegation
-    description: Switch. Return user accounts that are not marked as 'sensitive and
-      not allowed for delegation'
+    description: Return user accounts that are not marked as 'sensitive and not allowed
+      for delegation'
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: UserAdminCount
     description: Search for users users with '(adminCount=1)' (meaning are/were privileged).
     required: false
@@ -101,14 +105,21 @@ options:
     required: false
     value: ''
   - name: StopOnSuccess
-    description: Switch. Stop hunting after finding after finding a target user.
+    description: Stop hunting after finding after finding a target user.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: CheckAccess
-    description: Switch. Check if the current user has local admin access to found
-      machines.
+    description: Check if the current user has local admin access to found machines.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Delay
     description: Delay between enumerating hosts, defaults to 0.
     required: false
@@ -137,27 +148,39 @@ options:
     required: false
     value: ''
   - name: Tombstone
-    description: Switch. Specifies that the search should also return deleted/tombstoned
+    description: Specifies that the search should also return deleted/tombstoned
       objects.
     required: false
     value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Jitter
     description: Specifies the jitter (0-1.0) to apply to any specified -Delay, defaults
       to +/- 0.3.
     required: false
     value: ''
   - name: Stealth
-    description: Switch. Only enumerate sessions from connonly used target servers.
+    description: Only enumerate sessions from connonly used target servers.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: StealthSource
     description: The source of target servers to use, 'DFS' (distributed file servers),
     required: false
     value: ''
   - name: ShowAll
-    description: Switch. Return all user location results without filtering.
+    description: Return all user location results without filtering.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Threads
     description: The maximum concurrent threads to execute.
     required: false

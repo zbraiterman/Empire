@@ -20,12 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Added pool health monitoring that warns at 80% capacity
 -   Added `mysql` pytest marker for tests requiring MySQL and Docker
 -   Added performance test suite (`empire/test/test_performance/`) for pool exhaustion and event loop blocking regression testing
+-   Added `strict` and `suggested_values` to boolean switch options in modules for better validation and UI hints
+-   Added dynamic `depends_on` options to stagers so dependent fields (e.g. `Bypasses`, `Obfuscate`, `ObfuscateCommand`) are shown/hidden based on the selected listener type
+-   Added `nanodump` BOF module for creating minidumps of the LSASS process using various evasion techniques (handle duplication, process forking, snapshot, seclogon handle leaking)
 
 ### Changed
 
 -   Agent check-in uses single INSERT with ON DUPLICATE KEY UPDATE / ON CONFLICT DO NOTHING instead of SELECT-then-INSERT (2 queries → 1)
 -   All FastAPI route handlers converted from `async def` to `def`. FastAPI now dispatches every handler to a thread pool, preventing synchronous SQLAlchemy calls from blocking the uvicorn event loop. Handlers that previously offloaded work via `asyncio.to_thread()` no longer need to — the thread pool provides the same isolation automatically.
 -   High-frequency hooks (`AFTER_AGENT_CALLBACK_HOOK`, `AFTER_TASKING_RESULT_HOOK`, `AFTER_AGENT_CHECKIN_HOOK`, `AFTER_TASKING_HOOK`) now fire with `None` as the session argument. `_run_async_hook` and `run_hooks` provide a fresh managed session to hook callbacks, eliminating the 2x connection amplification that occurred when hooks opened a second connection while the caller still held the first.
+-   Cleaned up redundant "Switch." prefixes and duplicate description text from module option descriptions
+-   Marked `Listener` and `Command` options as conditionally required in 7 lateral movement modules (`invoke_psexec`, `invoke_wmi`, `invoke_smbexec`, `invoke_dcom`, `invoke_psremoting`, `inveigh_relay`, `invoke_executemsbuild`) so they are validated when their `depends_on` condition is met
 
 ### Removed
 
@@ -38,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Fixed unnecessary GitHub API call on every server startup when the compiler is already cached locally
 -   Fixed unhandled `TagInvalidException` in `parse_routing_packet` that caused request crashes from stale agents or non-agent traffic
 -   Fixed `TypeError` in BOF module parameter packing when integer values were passed to options that require space-checking
+-   Fixed module option descriptions for `Obfuscate` and `ObfuscateCommand` that contained redundant text
+-   Fixed `evaluate_dependencies` crashing when `DependsOn` key exists but is `None`
+-   Fixed strict option validation crashing when `SuggestedValues` is `None`
+-   Fixed options with unmet `depends_on` conditions being excluded from params, causing `KeyError` in module `generate()` functions — they now pass through with their default value
+-   Fixed broken `revert_options` logic in `stager_service` that assigned entire option dicts as values, causing circular reference errors during JSON serialization
+-   Fixed `invoke_ntsd` module setting stager options without the `["Value"]` key, causing `TypeError` during launcher generation
+-   Fixed `invoke_executemsbuild` `Command` option `depends_on` pointing to `Payload=Empire` instead of `Payload=Manual`, and added missing `depends_on` for `Listener`
 
 ## [6.5.0] - 2026-03-08
 

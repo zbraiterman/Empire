@@ -64,7 +64,7 @@ options:
       - True
       - False
   - name: ShowAll
-    description: Switch. Show all results (default is to only show 200s).
+    description: Show all results (default is to only show 200s).
     required: false
     value: 'False'
     strict: true

@@ -703,9 +703,10 @@ def test_format_bof_output_dotnet_agent(module_service):
         obfuscate=False,
     )
 
-    assert "|," in result
-    script_file, b64_json = result.split("|,", 1)
+    assert "|," in result.data
+    script_file, b64_json = result.data.split("|,", 1)
     assert script_file  # non-empty file path
+    assert len(result.files) == 1
 
     decoded = json.loads(base64.b64decode(b64_json))
     assert decoded["Entrypoint"] == "go"
@@ -722,7 +723,7 @@ def test_format_bof_output_custom_entry_point(module_service):
         entry_point="main",
     )
 
-    _, b64_json = result.split("|,", 1)
+    _, b64_json = result.data.split("|,", 1)
     decoded = json.loads(base64.b64decode(b64_json))
     assert decoded["Entrypoint"] == "main"
 

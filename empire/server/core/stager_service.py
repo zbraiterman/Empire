@@ -67,11 +67,6 @@ class StagerService:
         if err:
             return None, err
 
-        revert_options = {}
-        for key, value in template_instance.options.items():
-            revert_options[key] = template_instance.options[key]["Value"]
-            template_instance.options[key]["Value"] = value
-
         set_options(template_instance, cleaned_options)
 
         # stager instances don't have a validate method. but they could

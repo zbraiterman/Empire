@@ -58,10 +58,13 @@ options:
     required: false
     value: ''
   - name: CheckShareAccess
-    description: Switch. Only display found shares that the local user has access
-      to.
+    description: Only display found shares that the local user has access to.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Server
     description: Specifies an active directory server (domain controller) to bind
       to

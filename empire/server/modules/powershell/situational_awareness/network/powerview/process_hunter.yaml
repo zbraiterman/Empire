@@ -53,9 +53,13 @@ options:
     required: false
     value: ''
   - name: ComputerUnconstrained
-    description: Switch. Search computer objects that have unconstrained delegation.
+    description: Search computer objects that have unconstrained delegation.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: ComputerOperatingSystem
     description: Return computers with a specific operating system, wildcards accepted.
     required: false

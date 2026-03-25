@@ -40,18 +40,29 @@ options:
     required: true
     value: ''
   - name: ExcludeWindows
-    description: Switch. Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*
+    description: Exclude paths from C:\Windows\* instead of just C:\Windows\System32\*
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: ExcludeProgramFiles
-    description: Switch. Exclude paths from C:\Program Files\* and C:\Program Files
-      (x86)\*
+    description: Exclude paths from C:\Program Files\* and C:\Program Files (x86)\*
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: ExcludeOwned
-    description: Switch. Exclude processes the current user owns.
+    description: Exclude processes the current user owns.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: OutputFunction
     description: PowerShell's output function to use ("Out-String", "ConvertTo-Json",
       "ConvertTo-Csv", "ConvertTo-Html", "ConvertTo-Xml").

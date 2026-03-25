@@ -480,7 +480,7 @@ class ModuleService:
         agent_language: str,
         obfuscate: bool = False,
         entry_point: str = "go",
-    ) -> str:
+    ) -> str | ModuleExecutionRequest:
         """
         Build the final output string for a BOF module.
 
@@ -515,7 +515,11 @@ class ModuleService:
             json.dumps(params_dict).encode("utf-8")
         ).decode("utf-8")
 
-        return f"{script_file}|,{final_base64_json}"
+        return ModuleExecutionRequest(
+            command="",
+            data=f"{script_file}|,{final_base64_json}",
+            files=[script_file],
+        )
 
     def generate_go_bof(
         self,

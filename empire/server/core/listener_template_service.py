@@ -65,6 +65,6 @@ class ListenerTemplateService:
                 value.setdefault("SuggestedValues", [])
                 value.setdefault("Strict", False)
                 value.setdefault("Internal", False)
-                value.setdefault("Depends_on", [])
+                value.setdefault("DependsOn", [])
 
             self._loaded_listener_templates[slugify(listener_name)] = listener

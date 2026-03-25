@@ -49,9 +49,13 @@ options:
     required: false
     value: ''
   - name: LDAP
-    description: Switch. Use LDAP queries to determine the domain controllers.
+    description: Use LDAP queries to determine the domain controllers.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: OutputFunction
     description: PowerShell's output function to use ("Out-String", "ConvertTo-Json",
       "ConvertTo-Csv", "ConvertTo-Html", "ConvertTo-Xml").
