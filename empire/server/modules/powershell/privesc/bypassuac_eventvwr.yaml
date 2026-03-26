@@ -36,6 +36,16 @@ options:
     description: Listener to use.
     required: true
     value: ''
+  - name: Language
+    description: Language of the stager to generate (if using a Listener).
+    required: true
+    value: powershell
+    strict: true
+    suggested_values:
+      - powershell
+      - csharp
+      - ironpython
+      - go
   - name: Obfuscate
     description: Obfuscate the launcher powershell code, uses the ObfuscateCommand
       for obfuscation types.
@@ -45,11 +55,16 @@ options:
     suggested_values:
       - True
       - False
+    depends_on:
+      - name: Language
+        values: ['powershell']
   - name: ObfuscateCommand
     description: The Invoke-Obfuscation command to use.
     required: false
     value: Token\All\1
     depends_on:
+      - name: Language
+        values: ['powershell']
       - name: Obfuscate
         values: ['True']
   - name: Bypasses

