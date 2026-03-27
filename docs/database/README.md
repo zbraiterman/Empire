@@ -10,6 +10,28 @@ The install script will install MySQL if you install on one of the supported ope
 Config values can also be set via environment variables. The convention is to use `EMPIRE_TOPLEVEL__NEXT_SETTING` for each setting in `config.yaml`.
 For example: `EMPIRE_DATABASE__USE='mysql'` will override the `database.use` setting in `config.yaml`.
 
+## Migrations
+
+Empire uses [Alembic](https://alembic.sqlalchemy.org/) for database schema migrations. This allows schema changes to be applied incrementally without requiring a full database reset.
+
+On startup, `startup_db()` stamps the database at the current Alembic head revision. When future updates include schema changes, migrations can be applied via the `migrate_db()` function without data loss.
+
+### Creating a new migration
+
+After modifying SQLAlchemy models in `empire/server/core/db/models.py`, generate a migration:
+
+```bash
+poetry run alembic revision --autogenerate -m "describe the change"
+```
+
+Review the generated file in `empire/server/core/db/alembic/versions/` to ensure the `upgrade()` and `downgrade()` functions are correct, then commit it with your model changes.
+
+### Backing up before migrations
+
+The `backup_db()` function creates a timestamped backup before applying migrations:
+- **SQLite**: copies the database file to `~/.local/share/empire/backups/`
+- **MySQL**: runs `mysqldump` to the same backup directory
+
 # Docker
 The Docker image still defaults to SQLite. To use MySQL, you can change `config.yaml` or utilize the `DATABASE_USE` enviornment variable. For example `docker run -p 3306:3306 -p 1337:1337 -e DATABASE_USE='mysql' -it bcsecurity/empire:latest`.
 The Docker image does not contain MySQL, so you will need to run a MySQL container or install MySQL on the host machine.

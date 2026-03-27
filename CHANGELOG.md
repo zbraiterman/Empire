@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+-   Added Alembic database migration framework for versioned schema management. Untracked databases are stamped at the baseline revision on first startup; already-tracked databases are left as-is so pending migrations can be applied. Includes `migrate_db()` and `backup_db()` functions for future update workflows.
 -   Added configurable MySQL connection pool settings (`pool_size`, `max_overflow`, `pool_pre_ping`, `pool_recycle`) via server config YAML
 -   Added pool health monitoring that warns at 80% capacity
 -   Added `mysql` pytest marker for tests requiring MySQL and Docker

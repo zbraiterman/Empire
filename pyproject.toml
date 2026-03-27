@@ -22,6 +22,7 @@ jinja2 = "^3.1.6"
 pyparsing = "^3.3.2"
 PyMySQL = "^1.1.2"
 SQLAlchemy = "^2.0.46"
+alembic = "^1.15.0"
 PyYAML = "^6.0.3"
 SQLAlchemy-Utc = "^0.14.0"
 pycryptodome = "^3.23.0"
@@ -137,11 +138,16 @@ extend-immutable-calls = ["fastapi.Depends", "fastapi.params.Depends", "fastapi.
 "empire/server/api/app.py" = ["PLC0415"]
 "empire/server/api/v2/shared_dependencies.py" = ["PLC0415"]
 "empire/server/server.py" = ["PLC0415"]
+# Alembic imports are deferred to avoid circular deps with env.py;
+# startup_db and backup_db have many branches/statements due to
+# schema setup, Alembic init, and multi-backend backup logic.
+"empire/server/core/db/base.py" = ["PLC0415", "PLR0911", "PLR0912", "PLR0915"]
 
 # A few imports should be local because they need to be reset between tests.
 "empire/test/conftest.py" = ["PLC0415"]
 "empire/test/test_logs.py" = ["PLC0415"]
 "empire/test/test_listener_generate_launcher.py" = ["PLC0415"]
+"empire/test/test_alembic.py" = ["PLC0415"]
 
 [tool.coverage.run]
 omit = [
