@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Fixed broken `revert_options` logic in `stager_service` that assigned entire option dicts as values, causing circular reference errors during JSON serialization
 -   Fixed `invoke_ntsd` module setting stager options without the `["Value"]` key, causing `TypeError` during launcher generation
 -   Fixed `invoke_executemsbuild` `Command` option `depends_on` pointing to `Payload=Empire` instead of `Payload=Manual`, and added missing `depends_on` for `Listener`
+-   Fixed agent staging log messages displaying wrong language (e.g. "Python PUB key" for PowerShell agents, "PS" in C# block) by replacing hardcoded language names with the actual agent language
+-   Fixed incorrect log levels in agent communication: `log.error` for normal conditions (agent not active, agent exiting) downgraded to `log.debug`/`log.info`, `log.info` for invalid data (bad language spec, malformed sysinfo) upgraded to `log.warning`
+-   Fixed typo in SOCKS client error message ("failed to started" -> "failed to start")
 
 ## [6.5.0] - 2026-03-08
 
