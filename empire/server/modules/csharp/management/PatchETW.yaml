@@ -129,14 +129,5 @@ csharp:
         }
     }
   ReferenceSourceLibraries: []
-  ReferenceAssemblies:
-    - Name: mscorlib.dll
-      Location: net40\mscorlib.dll
-      DotNetVersion: Net40
-    - Name: System.dll
-      Location: net40\System.dll
-      DotNetVersion: Net40
-    - Name: System.Core.dll
-      Location: net40\System.Core.dll
-      DotNetVersion: Net40
+  ReferenceAssemblies: []
   EmbeddedResources: []

@@ -34,6 +34,62 @@ function command_exists() {
   command -v "$1" >/dev/null 2>&1;
 }
 
+function install_dotnet(){
+  if [ "$ASSUME_YES" == "1" ] ;then
+    answer="Y"
+  else
+    echo -n -e "\x1b[1;33m[>] Do you want to install .NET 10 SDK? It is only needed to compile the Empire-Compiler from source (y/N)? \x1b[0m"
+    read -r answer
+  fi
+  if [ "$answer" != "${answer#[Yy]}" ] ;then
+    echo -e "\x1b[1;34m[*] Installing .NET 10 SDK\x1b[0m"
+
+    if command_exists dotnet && dotnet --list-sdks 2>/dev/null | grep -q "^10\."; then
+      echo -e "\x1b[1;32m[+] .NET 10 SDK is already installed, skipping\x1b[0m"
+      return
+    fi
+
+    DOTNET_INSTALL_SCRIPT=$(mktemp)
+    if ! curl -sSL -o "$DOTNET_INSTALL_SCRIPT" https://dot.net/v1/dotnet-install.sh; then
+      echo -e "\x1b[1;31m[-] Failed to download .NET install script\x1b[0m"
+      rm -f "$DOTNET_INSTALL_SCRIPT"
+      return 1
+    fi
+
+    if ! bash "$DOTNET_INSTALL_SCRIPT" --channel 10.0; then
+      echo -e "\x1b[1;31m[-] .NET 10 SDK installation failed\x1b[0m"
+      rm -f "$DOTNET_INSTALL_SCRIPT"
+      return 1
+    fi
+    rm -f "$DOTNET_INSTALL_SCRIPT"
+
+    if ! "$HOME/.dotnet/dotnet" --version >/dev/null 2>&1; then
+      echo -e "\x1b[1;31m[-] .NET 10 SDK installation completed but dotnet binary is not functional\x1b[0m"
+      return 1
+    fi
+
+    export DOTNET_ROOT="$HOME/.dotnet"
+    export PATH="$DOTNET_ROOT:$PATH"
+
+    grep -q 'DOTNET_ROOT' ~/.bashrc 2>/dev/null || {
+      echo 'export DOTNET_ROOT="$HOME/.dotnet"' >> ~/.bashrc
+      echo 'export PATH="$DOTNET_ROOT:$PATH"' >> ~/.bashrc
+    }
+
+    grep -q 'DOTNET_ROOT' ~/.zshrc 2>/dev/null || {
+      echo 'export DOTNET_ROOT="$HOME/.dotnet"' >> ~/.zshrc
+      echo 'export PATH="$DOTNET_ROOT:$PATH"' >> ~/.zshrc
+    }
+
+    # Symlink for Docker builds since bashrc and zshrc files are not sourced
+    if ! sudo ln -sf "$HOME/.dotnet/dotnet" /usr/bin/dotnet 2>/dev/null; then
+      echo -e "\x1b[1;33m[!] Could not create /usr/bin/dotnet symlink. You may need to add \$HOME/.dotnet to your PATH manually.\x1b[0m"
+    fi
+  else
+    echo -e "\x1b[1;34m[*] Skipping .NET 10 SDK\x1b[0m"
+  fi
+}
+
 function install_mono(){
   if [ "$ASSUME_YES" == "1" ] ;then
     answer="Y"
@@ -347,6 +403,9 @@ else
 fi
 
 install_go
+if [ "$COMPILE_FROM_SOURCE" == "1" ]; then
+  install_dotnet
+fi
 install_mono
 install_mingw
 

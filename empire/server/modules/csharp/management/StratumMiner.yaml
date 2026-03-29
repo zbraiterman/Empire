@@ -110,30 +110,9 @@ csharp:
       Language: CSharp
       CompatibleDotNetVersions:
         - Net40
-      ReferenceAssemblies:
-        - Name: System.dll
-          Location: net40\System.dll
-          DotNetVersion: Net40
-        - Name: System.Core.dll
-          Location: net40\System.Core.dll
-          DotNetVersion: Net40
-        - Name: mscorlib.dll
-          Location: net40\mscorlib.dll
-          DotNetVersion: Net40
-        - Name: System.Runtime.Serialization.dll
-          Location: net40\System.Runtime.Serialization.dll
-          DotNetVersion: Net40
-        - Name: System.XML.dll
-          Location: net40\System.XML.dll
-          DotNetVersion: Net40
-        - Name: Replicon.Cryptography.SCrypt.dll
-          Location: net40\Replicon.Cryptography.SCrypt.dll
-          DotNetVersion: Net40
-        - Name: System.Management.dll
-          Location: net40\System.Management.dll
-          DotNetVersion: Net40
+      ReferenceAssemblies: []
       EmbeddedResources:
         - Name: Replicon.Cryptography.SCrypt.dll
-          Location: Replicon.Cryptography.SCrypt.dll
+          Location: net40\Replicon.Cryptography.SCrypt.dll
   ReferenceAssemblies: []
   EmbeddedResources: []

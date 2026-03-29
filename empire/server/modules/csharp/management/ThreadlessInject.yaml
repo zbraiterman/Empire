@@ -138,31 +138,7 @@ csharp:
       Language: CSharp
       CompatibleDotNetVersions:
         - Net40
-      ReferenceAssemblies:
-        - Name: System.dll
-          Location: net40\System.dll
-          DotNetVersion: Net40
-        - Name: System.Core.dll
-          Location: net40\System.Core.dll
-          DotNetVersion: Net40
-        - Name: System.Data.dll
-          Location: net40\System.Data.dll
-          DotNetVersion: Net40
-        - Name: mscorlib.dll
-          Location: net40\mscorlib.dll
-          DotNetVersion: Net40
-        - Name: System.Drawing.dll
-          Location: net40\System.Drawing.dll
-          DotNetVersion: Net40
-        - Name: System.Runtime.Serialization.dll
-          Location: net40\System.Runtime.Serialization.dll
-          DotNetVersion: Net40
-        - Name: System.Xml.dll
-          Location: net40\System.XML.dll
-          DotNetVersion: Net40
-        - Name: System.Xml.Linq.dll
-          Location: net40\System.Xml.Linq.dll
-          DotNetVersion: Net40
+      ReferenceAssemblies: []
       EmbeddedResources: []
   ReferenceAssemblies: []
   EmbeddedResources: []

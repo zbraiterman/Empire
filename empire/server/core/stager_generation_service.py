@@ -44,6 +44,19 @@ class StagerGenerationService:
         self.obfuscation_service = main_menu.obfuscationv2
         self.dotnet_compiler = main_menu.dotnet_compiler
 
+    def _write_launcher_resource(self, code: str) -> None:
+        """Write launcher code to the embedded resources directory for compilation.
+
+        This file path is shared across stager types (PowerShell and Python),
+        so concurrent stager generations can overwrite each other.
+        """
+        launcher_path = (
+            self.dotnet_compiler.compiler_dir
+            / "Data/EmbeddedResources/common/launcher.txt"
+        )
+        launcher_path.parent.mkdir(parents=True, exist_ok=True)
+        launcher_path.write_text(code, encoding="utf-8")
+
     def generate_launcher_fetcher(
         self,
         encode=True,
@@ -152,11 +165,7 @@ class StagerGenerationService:
             encoding="utf-8"
         )
 
-        # Write text file to resources to be embedded
-        with (
-            self.dotnet_compiler.compiler_dir / "Data/EmbeddedResources/launcher.txt"
-        ).open("w") as f:
-            f.write(posh_code)
+        self._write_launcher_resource(posh_code)
 
         return self.dotnet_compiler.compile_stager(
             stager_yaml, "CSharpPS", dot_net_version=dot_net_version, confuse=obfuscate
@@ -319,13 +328,7 @@ class StagerGenerationService:
             encoding="utf-8"
         )
 
-        # Write text file to resources to be embedded
-        # This file is problematic because multiple runs
-        # can overwrite the file and cause issues.
-        with (
-            self.dotnet_compiler.compiler_dir / "Data/EmbeddedResources/launcher.txt"
-        ).open("w") as f:
-            f.write(python_code)
+        self._write_launcher_resource(python_code)
 
         return self.dotnet_compiler.compile_stager(
             stager_yaml, "CSharpPy", dot_net_version=dot_net_version, confuse=obfuscate

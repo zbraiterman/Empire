@@ -47,7 +47,7 @@ database:
     ip_deny_list: []
 empire_compiler:
   repo: BC-SECURITY/Empire-Compiler
-  ref: v0.4.4
+  ref: v1.0.0-a.1
   # Path to the confuser xml project file you want to use
   confuser_proj: empire/server/data/confuser.crproj
 starkiller:

@@ -41,7 +41,7 @@ database:
       - etw
 empire_compiler:
   repo: BC-SECURITY/Empire-Compiler
-  ref: v0.4.4
+  ref: v1.0.0-a.1
   confuser_proj: empire/server/data/confuser.crproj
 starkiller:
   enabled: true
