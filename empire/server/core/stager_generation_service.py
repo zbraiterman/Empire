@@ -18,6 +18,7 @@ from empire.server.common import helpers, packets
 from empire.server.core.db import models
 from empire.server.core.db.base import SessionLocal
 from empire.server.utils import data_util
+from empire.server.utils.donut_util import donut_create
 
 if typing.TYPE_CHECKING:
     from empire.server.common.empire import MainMenu
@@ -186,7 +187,7 @@ class StagerGenerationService:
             log.warning(err, exc_info=True)
             return None, err
 
-        shellcode = donut.create(file=str(directory), arch=arch_type)
+        shellcode = donut_create(file=str(directory), arch=arch_type)
         return shellcode, None
 
     def generate_exe_oneliner(
@@ -348,7 +349,7 @@ class StagerGenerationService:
             return None, err
 
         directory = self.generate_python_exe(posh_code, dot_net_version)
-        shellcode = donut.create(file=str(directory), arch=arch_type)
+        shellcode = donut_create(file=str(directory), arch=arch_type)
         return shellcode, None
 
     def generate_csharp_shellcode(
@@ -389,7 +390,7 @@ class StagerGenerationService:
             return None, "Failed to generate C# EXE for shellcode"
 
         # Create shellcode from the EXE
-        shellcode = donut.create(file=str(exe_path), arch=arch_type)
+        shellcode = donut_create(file=str(exe_path), arch=arch_type)
         return shellcode, None
 
     def generate_shellcode(  # noqa: PLR0913

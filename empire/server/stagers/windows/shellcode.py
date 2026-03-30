@@ -5,6 +5,7 @@ try:
 except ModuleNotFoundError:
     donut = None
 
+from empire.server.utils.donut_util import donut_create
 from empire.server.utils.module_util import handle_error_message
 
 log = logging.getLogger(__name__)
@@ -171,7 +172,7 @@ class Stager:
                     "module donut-shellcode not installed. It is only supported on x86."
                 )
 
-            return donut.create(file=str(launcher), arch=arch_type)
+            return donut_create(file=str(launcher), arch=arch_type)
 
         if language.lower() == "python":
             shellcode, err = self.mainMenu.stagergenv2.generate_python_shellcode(
