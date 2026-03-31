@@ -14,11 +14,17 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
 import yaml
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session as SASession
 from starlette.status import HTTP_200_OK
+
+from empire.server.core.db.models import Agent, AgentCheckIn
+from empire.test.conftest import make_agent
 
 log = logging.getLogger(__name__)
 
@@ -286,3 +292,104 @@ def auth_token(empire_base_url):
 def auth_header(auth_token):
     """Return a dict suitable for passing as ``headers=`` to httpx."""
     return {"X-Empire-Token": f"Bearer {auth_token}"}
+
+
+_AGENT_ID = "PERFTEST01"
+
+
+@pytest.fixture(scope="session")
+def perf_db(mysql_port):
+    """SQLAlchemy session for the perf-test MySQL container."""
+    url = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@127.0.0.1:{mysql_port}/{MYSQL_DATABASE}"
+    engine = create_engine(url)
+    yield SASession(engine)
+    engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def test_agent_id(perf_db, empire_base_url, auth_header):
+    """Insert a fake agent directly into the DB for module-task perf tests.
+
+    Agents are normally created through listener staging, which is too
+    heavyweight for the perf-test harness.  Uses the ORM models so the
+    fixture stays in sync with schema changes.
+    """
+    models = SimpleNamespace(Agent=Agent)
+
+    # Idempotent: clean up any leftover from a crashed run
+    perf_db.query(AgentCheckIn).filter_by(agent_id=_AGENT_ID).delete()
+    perf_db.query(Agent).filter_by(session_id=_AGENT_ID).delete()
+    perf_db.commit()
+
+    perf_db.add(make_agent(models, name=_AGENT_ID))
+    perf_db.add(AgentCheckIn(agent_id=_AGENT_ID))
+    perf_db.commit()
+
+    yield _AGENT_ID
+
+    perf_db.query(AgentCheckIn).filter_by(agent_id=_AGENT_ID).delete()
+    perf_db.query(Agent).filter_by(session_id=_AGENT_ID).delete()
+    perf_db.commit()
+
+
+@pytest.fixture(scope="session")
+def obfuscation_enabled(empire_base_url, auth_header):
+    """Enable PowerShell obfuscation via the Empire API."""
+    resp = httpx.put(
+        f"{empire_base_url}/api/v2/obfuscation/global/powershell",
+        json={
+            "module": "invoke-obfuscation",
+            "command": "Token\\All\\1",
+            "enabled": True,
+        },
+        headers=auth_header,
+        timeout=30,
+    )
+    if resp.status_code != HTTP_200_OK:
+        pytest.skip(
+            f"Could not enable obfuscation (HTTP {resp.status_code}): {resp.text}"
+        )
+    return True
+
+
+@pytest.fixture(scope="session")
+def powershell_module_id(empire_base_url, auth_header):
+    """Discover an enabled PowerShell module that triggers Invoke-Obfuscation.
+
+    Modules with ``script_path`` load external .ps1 files and pass them
+    through Invoke-Obfuscation when obfuscation is enabled.  Modules
+    without ``script_path`` (inline scripts or custom_generate) may skip
+    the subprocess entirely, making them unsuitable for obfuscation perf
+    tests.
+    """
+    resp = httpx.get(
+        f"{empire_base_url}/api/v2/modules",
+        headers=auth_header,
+        timeout=30,
+    )
+    resp.raise_for_status()
+
+    modules = resp.json().get("records", [])
+
+    modules_by_id = {mod["id"]: mod for mod in modules}
+
+    # These modules have script_path (external .ps1 files) and no
+    # custom_generate, so they go through the full Invoke-Obfuscation
+    # subprocess when obfuscation is enabled.  Smallest modules first
+    # to keep CI fast — the blocking test only needs obfuscation to
+    # take longer than STAGER_WAIT_BEFORE_PROBE_SECONDS (0.5s).
+    candidates = [
+        "powershell_situational_awareness_network_arpscan",
+        "powershell_situational_awareness_network_portscan",
+        "powershell_situational_awareness_network_powerview_get_computer",
+    ]
+    for candidate in candidates:
+        mod = modules_by_id.get(candidate)
+        if mod and mod.get("enabled"):
+            log.info("Selected module for obfuscation perf test: %s", candidate)
+            return candidate
+
+    pytest.skip(
+        "No suitable PowerShell module found for obfuscation perf test. "
+        f"Tried: {candidates}"
+    )

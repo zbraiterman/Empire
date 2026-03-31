@@ -1,12 +1,15 @@
 import base64
 import json
+import shutil
+import subprocess
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
 from empire.server.core.exceptions import ModuleValidationException
 from empire.server.core.module_service import ModuleService
+from empire.server.core.obfuscation_service import ObfuscationService
 
 
 @pytest.fixture(scope="module")
@@ -771,3 +774,516 @@ def test_execute_module_bof_custom_generate_go_agent(module_service, agent_mock)
     assert "File" in decoded
     assert "HexData" in decoded
     assert "Entrypoint" not in decoded
+
+
+def test_generate_script_powershell_obfuscates_source_and_script_end_separately(
+    module_service, models
+):
+    """Verify that _generate_script_powershell does NOT double-obfuscate.
+
+    When obfuscation is enabled, the module source is already obfuscated by
+    get_module_source(obfuscate=True).  finalize_module() only obfuscates
+    script_end (the invoke command), not the already-obfuscated source.
+    """
+    module = module_service.get_by_id("powershell_code_execution_invoke_boolang")
+
+    obfuscation_config = Mock()
+    obfuscation_config.enabled = True
+    obfuscation_config.command = "Token\\All\\1"
+
+    fake_source = "function Invoke-Boolang { <# original source #> }"
+    obfuscated_source = f"OBFUSCATED({fake_source})"
+
+    obfuscate_calls = []
+
+    def mock_obfuscate(script, command, timeout=300):
+        obfuscate_calls.append(script)
+        return f"OBFUSCATED({script})"
+
+    with (
+        patch.object(
+            module_service,
+            "get_module_source",
+            return_value=(obfuscated_source, None),
+        ) as mock_get_source,
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate",
+            side_effect=mock_obfuscate,
+        ),
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate_keywords",
+            side_effect=lambda x: x,
+        ),
+    ):
+        params = {"Agent": "ABC123", "BooSource": "test"}
+        result = module_service._generate_script_powershell(
+            module, params, obfuscation_config
+        )
+
+        # get_module_source should have been called with obfuscate=True
+        mock_get_source.assert_called_once_with(
+            module_name=module.script_path,
+            obfuscate=True,
+            obfuscate_command="Token\\All\\1",
+        )
+
+        # obfuscate() should have been called exactly ONCE inside
+        # _generate_script_powershell — for script_end only.
+        # (get_module_source handles its own obfuscation internally.)
+        assert len(obfuscate_calls) == 1, (
+            f"Expected obfuscate() to be called once (for script_end), "
+            f"but it was called {len(obfuscate_calls)} time(s). "
+            f"Calls: {obfuscate_calls}"
+        )
+
+        # The single obfuscate call should be for the script_end, not for
+        # the combined script+script_end (which would indicate double-obfuscation).
+        assert not obfuscate_calls[0].startswith("OBFUSCATED("), (
+            "obfuscate() was called on already-obfuscated content, "
+            "indicating double-obfuscation"
+        )
+
+        # The result should contain the obfuscated source (from get_module_source)
+        # and the separately obfuscated script_end.
+        assert "OBFUSCATED(" in result
+        assert obfuscated_source in result
+
+
+def test_generate_script_powershell_no_obfuscation_skips_obfuscate(
+    module_service, models
+):
+    """When obfuscation is disabled, obfuscate() should not be called at all."""
+    module = module_service.get_by_id("powershell_code_execution_invoke_boolang")
+
+    obfuscation_config = Mock()
+    obfuscation_config.enabled = False
+    obfuscation_config.command = ""
+
+    fake_source = "function Invoke-Boolang { <# original source #> }"
+
+    with (
+        patch.object(
+            module_service,
+            "get_module_source",
+            return_value=(fake_source, None),
+        ),
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate",
+        ) as mock_obfuscate,
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate_keywords",
+            side_effect=lambda x: x,
+        ),
+    ):
+        params = {"Agent": "ABC123", "BooSource": "test"}
+        result = module_service._generate_script_powershell(
+            module, params, obfuscation_config
+        )
+
+        mock_obfuscate.assert_not_called()
+        assert fake_source in result
+
+
+# ---------------------------------------------------------------------------
+# finalize_module — direct tests for both script_already_obfuscated paths
+# ---------------------------------------------------------------------------
+
+
+def test_finalize_module_obfuscates_full_script_when_not_preobfuscated(module_service):
+    """When script_already_obfuscated=False (default), finalize_module should
+    obfuscate the combined script+script_end as a single unit.  This is the
+    path used by custom_generate modules (ask.py, logoff.py, etc.)."""
+    raw_script = "function Invoke-Something { Write-Output 'hello' }"
+    script_end = " Invoke-Something -Param 'value'"
+
+    obfuscate_calls = []
+
+    def mock_obfuscate(script, command, timeout=300):
+        obfuscate_calls.append(script)
+        return f"OBFUSCATED({script})"
+
+    with (
+        patch.object(
+            module_service.obfuscation_service, "obfuscate", side_effect=mock_obfuscate
+        ),
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate_keywords",
+            side_effect=lambda x: x,
+        ),
+    ):
+        result = module_service.finalize_module(
+            script=raw_script,
+            script_end=script_end,
+            obfuscate=True,
+            obfuscation_command="Token\\All\\1",
+            script_already_obfuscated=False,
+        )
+
+    # Should obfuscate the COMBINED script, not just script_end
+    assert len(obfuscate_calls) == 1
+    assert obfuscate_calls[0] == raw_script + script_end
+    assert result == f"OBFUSCATED({raw_script}{script_end})"
+
+
+def test_finalize_module_obfuscates_only_script_end_when_preobfuscated(module_service):
+    """When script_already_obfuscated=True, finalize_module should only
+    obfuscate script_end, leaving the pre-obfuscated source intact."""
+    pre_obfuscated = "ALREADY_OBFUSCATED_SOURCE"
+    script_end = " Invoke-Something -Param 'value'"
+
+    obfuscate_calls = []
+
+    def mock_obfuscate(script, command, timeout=300):
+        obfuscate_calls.append(script)
+        return f"OBFUSCATED({script})"
+
+    with (
+        patch.object(
+            module_service.obfuscation_service, "obfuscate", side_effect=mock_obfuscate
+        ),
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate_keywords",
+            side_effect=lambda x: x,
+        ),
+    ):
+        result = module_service.finalize_module(
+            script=pre_obfuscated,
+            script_end=script_end,
+            obfuscate=True,
+            obfuscation_command="Token\\All\\1",
+            script_already_obfuscated=True,
+        )
+
+    # Should only obfuscate script_end, not the pre-obfuscated source
+    assert len(obfuscate_calls) == 1
+    assert obfuscate_calls[0] == script_end
+    assert pre_obfuscated in result
+
+
+# ---------------------------------------------------------------------------
+# obfuscate() fallback paths — non-zero returncode and empty output
+# ---------------------------------------------------------------------------
+
+
+def test_obfuscate_nonzero_returncode_returns_keyword_obfuscated_script(main_menu_mock):
+    """When subprocess exits with non-zero code, obfuscate() should return
+    the keyword-obfuscated script (graceful degradation)."""
+    obfuscation_service = ObfuscationService(main_menu=main_menu_mock)
+
+    raw_script = "Write-Host 'hello'"
+    keyword_result = "Write-Host 'KEYWORD_REPLACED'"
+
+    mock_completed = Mock()
+    mock_completed.returncode = 1
+    mock_completed.stderr = b"some error"
+
+    with (
+        patch(
+            "empire.server.core.obfuscation_service.data_util.is_powershell_installed",
+            return_value=True,
+        ),
+        patch.object(
+            obfuscation_service, "obfuscate_keywords", return_value=keyword_result
+        ),
+        patch(
+            "empire.server.core.obfuscation_service.subprocess.run",
+            return_value=mock_completed,
+        ),
+    ):
+        result = obfuscation_service.obfuscate(raw_script, "Token\\All\\1")
+
+    assert result == keyword_result
+
+
+def test_obfuscate_empty_output_returns_keyword_obfuscated_script(main_menu_mock):
+    """When subprocess succeeds but produces empty output, obfuscate() should
+    return the keyword-obfuscated script."""
+    obfuscation_service = ObfuscationService(main_menu=main_menu_mock)
+
+    raw_script = "Write-Host 'hello'"
+    keyword_result = "Write-Host 'KEYWORD_REPLACED'"
+
+    mock_completed = Mock()
+    mock_completed.returncode = 0
+
+    with (
+        patch(
+            "empire.server.core.obfuscation_service.data_util.is_powershell_installed",
+            return_value=True,
+        ),
+        patch.object(
+            obfuscation_service, "obfuscate_keywords", return_value=keyword_result
+        ),
+        patch(
+            "empire.server.core.obfuscation_service.subprocess.run",
+            return_value=mock_completed,
+        ),
+    ):
+        result = obfuscation_service.obfuscate(raw_script, "Token\\All\\1")
+
+    # The obfuscated file will be empty (NamedTemporaryFile with no writes from subprocess)
+    # so obfuscate() should detect empty output and return the keyword-obfuscated script
+    assert result == keyword_result
+
+
+# ---------------------------------------------------------------------------
+# preobfuscate_module_by_id
+# ---------------------------------------------------------------------------
+
+
+def test_preobfuscate_module_by_id_not_found(module_service):
+    with patch.object(module_service, "get_by_id", return_value=None):
+        result = module_service.preobfuscate_module_by_id("nonexistent")
+    assert "not found" in result
+
+
+def test_preobfuscate_module_by_id_no_script_path(module_service):
+    mock_module = Mock(script_path=None)
+    with patch.object(module_service, "get_by_id", return_value=mock_module):
+        result = module_service.preobfuscate_module_by_id("inline_only")
+    assert "no script_path" in result
+
+
+def test_preobfuscate_module_by_id_happy_path(module_service):
+    mock_module = Mock(script_path="test/test.ps1", language="powershell")
+    mock_config = Mock(command="Token\\All\\1")
+
+    with (
+        patch.object(module_service, "get_by_id", return_value=mock_module),
+        patch("empire.server.core.module_service.SessionLocal") as mock_sl,
+        patch.object(
+            module_service.obfuscation_service,
+            "get_obfuscation_config",
+            return_value=mock_config,
+        ),
+        patch.object(module_service, "obfuscate_module") as mock_obfuscate,
+    ):
+        mock_db = Mock()
+        mock_sl.begin.return_value.__enter__ = Mock(return_value=mock_db)
+        mock_sl.begin.return_value.__exit__ = Mock(return_value=False)
+
+        result = module_service.preobfuscate_module_by_id("test_module")
+
+    assert result is None
+    mock_obfuscate.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# obfuscate() timeout fallback
+# ---------------------------------------------------------------------------
+
+
+def test_obfuscate_timeout_returns_keyword_obfuscated_script(main_menu_mock):
+    """When subprocess.run raises TimeoutExpired, obfuscate() should return
+    the keyword-obfuscated (but not Invoke-Obfuscation-processed) script."""
+    obfuscation_service = ObfuscationService(main_menu=main_menu_mock)
+
+    raw_script = "Write-Host 'hello world'"
+    keyword_obfuscated = "Write-Host 'KEYWORD_OBFUSCATED'"
+
+    with (
+        patch(
+            "empire.server.core.obfuscation_service.data_util.is_powershell_installed",
+            return_value=True,
+        ),
+        patch.object(
+            obfuscation_service,
+            "obfuscate_keywords",
+            return_value=keyword_obfuscated,
+        ),
+        patch(
+            "empire.server.core.obfuscation_service.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="pwsh", timeout=300),
+        ),
+    ):
+        result = obfuscation_service.obfuscate(raw_script, "Token\\All\\1", timeout=300)
+
+    # Should get back the keyword-obfuscated version, not empty string
+    assert result == keyword_obfuscated
+
+
+# ---------------------------------------------------------------------------
+# _generate_script_powershell — inline script (no script_path) with obfuscation
+# ---------------------------------------------------------------------------
+
+
+def test_generate_script_powershell_inline_script_obfuscation(module_service, models):
+    """Verify _generate_script_powershell obfuscates inline module.script and
+    script_end separately when there is no script_path.  finalize_module
+    only obfuscates script_end, not the already-obfuscated inline source."""
+    module = module_service.get_by_id("powershell_code_execution_invoke_boolang")
+
+    # Create a copy-like mock that has no script_path but has an inline script
+    inline_module = Mock()
+    inline_module.script_path = None
+    inline_module.script = "function Invoke-Inline { <# inline source #> }"
+    inline_module.script_end = module.script_end
+    inline_module.advanced = module.advanced
+
+    obfuscation_config = Mock()
+    obfuscation_config.enabled = True
+    obfuscation_config.command = "Token\\All\\1"
+
+    obfuscate_calls = []
+
+    def mock_obfuscate(script, command, timeout=300):
+        obfuscate_calls.append(script)
+        return f"OBFUSCATED({script})"
+
+    with (
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate",
+            side_effect=mock_obfuscate,
+        ),
+        patch.object(
+            module_service.obfuscation_service,
+            "obfuscate_keywords",
+            side_effect=lambda x: x,
+        ),
+        patch.object(
+            module_service,
+            "finalize_module",
+            wraps=module_service.finalize_module,
+        ) as mock_finalize,
+    ):
+        params = {"Agent": "ABC123", "BooSource": "test"}
+        result = module_service._generate_script_powershell(
+            inline_module, params, obfuscation_config
+        )
+
+        # obfuscate() should be called twice: once for the inline script,
+        # once for script_end
+        expected_obfuscate_call_count = 2
+        assert len(obfuscate_calls) == expected_obfuscate_call_count, (
+            f"Expected obfuscate() called {expected_obfuscate_call_count} times "
+            f"(inline script + script_end), "
+            f"got {len(obfuscate_calls)}: {obfuscate_calls}"
+        )
+
+        # First call should be for the inline script
+        assert obfuscate_calls[0] == inline_module.script
+
+        # Second call should be for script_end (not the already-obfuscated inline script)
+        assert not obfuscate_calls[1].startswith("OBFUSCATED("), (
+            "script_end obfuscation was called on already-obfuscated content"
+        )
+
+        # finalize_module is called with obfuscate=True and
+        # script_already_obfuscated=True, so it only obfuscates script_end.
+        mock_finalize.assert_called_once()
+        _, kwargs = mock_finalize.call_args
+        assert kwargs.get("obfuscate") is True
+        assert kwargs.get("script_already_obfuscated") is True
+
+        # The result should contain both obfuscated parts
+        assert "OBFUSCATED(" in result
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — real Invoke-Obfuscation output verification
+# ---------------------------------------------------------------------------
+
+requires_powershell = pytest.mark.skipif(
+    not shutil.which("powershell") and not shutil.which("pwsh"),
+    reason="PowerShell (powershell or pwsh) is not available on this system",
+)
+
+
+@pytest.mark.slow
+@requires_powershell
+def test_obfuscate_produces_transformed_output(install_path):
+    """Verify Invoke-Obfuscation actually transforms the script content.
+
+    Calls the real obfuscation subprocess and checks that:
+    - The output is non-empty
+    - The output differs from the input
+    - Original identifiers are no longer present in plaintext
+    """
+    main_menu = Mock()
+    main_menu.install_path = Path(install_path)
+    obfuscation_service = ObfuscationService(main_menu=main_menu)
+
+    original_script = (
+        "function Invoke-PerfTestMarker {\n"
+        "    $PerfTestVariable = 'HelloFromPerfTest'\n"
+        "    Write-Output $PerfTestVariable\n"
+        "}\n"
+    )
+
+    result = obfuscation_service.obfuscate(
+        original_script, "Token\\All\\1", timeout=120
+    )
+
+    assert result, "Obfuscation returned empty output"
+    assert result != original_script, (
+        "Obfuscation returned the script unchanged — Invoke-Obfuscation may not be running"
+    )
+    # The original function name and variable should be obfuscated away
+    assert "Invoke-PerfTestMarker" not in result, (
+        f"Original function name 'Invoke-PerfTestMarker' still present in obfuscated output:\n{result[:500]}"
+    )
+    assert "PerfTestVariable" not in result, (
+        f"Original variable name 'PerfTestVariable' still present in obfuscated output:\n{result[:500]}"
+    )
+    assert "HelloFromPerfTest" not in result, (
+        f"Original string literal 'HelloFromPerfTest' still present in obfuscated output:\n{result[:500]}"
+    )
+
+
+@pytest.mark.slow
+@requires_powershell
+def test_finalize_module_obfuscates_script_end_not_source(install_path):
+    """End-to-end verification that finalize_module obfuscates script_end
+    while leaving the already-obfuscated source intact.
+
+    Uses real Invoke-Obfuscation to verify the output contains both
+    the pre-obfuscated source and a transformed script_end.
+    """
+    main_menu = Mock()
+    main_menu.install_path = Path(install_path)
+    obfuscation_service = ObfuscationService(main_menu=main_menu)
+
+    # Simulate a pre-obfuscated module source (already processed)
+    pre_obfuscated_source = (
+        "# This simulates pre-obfuscated source\n"
+        "Set-Variable -Name xQ3k -Value 'already_obfuscated_content'\n"
+    )
+    # A recognizable script_end that should get obfuscated
+    script_end = " Invoke-OriginalCommand -TargetParam 'SensitiveValue' | Out-String"
+
+    module_service_mock = Mock()
+    module_service_mock.obfuscation_service = obfuscation_service
+
+    # Call finalize_module directly via the real class method
+    result = ModuleService.finalize_module(
+        module_service_mock,
+        script=pre_obfuscated_source,
+        script_end=script_end,
+        obfuscate=True,
+        obfuscation_command="Token\\All\\1",
+        script_already_obfuscated=True,
+    )
+
+    assert result, "finalize_module returned empty output"
+
+    # The pre-obfuscated source should still be present (not re-obfuscated)
+    assert "already_obfuscated_content" in result, (
+        "Pre-obfuscated source was modified — finalize_module should not re-obfuscate it"
+    )
+
+    # The original script_end identifiers should be obfuscated away.
+    # Note: Token\All\1 obfuscates command names and string literals
+    # but not parameter names (e.g., -TargetParam survives).
+    assert "Invoke-OriginalCommand" not in result, (
+        f"script_end function name 'Invoke-OriginalCommand' was not obfuscated:\n{result[:500]}"
+    )
+    assert "SensitiveValue" not in result, (
+        f"script_end string 'SensitiveValue' was not obfuscated:\n{result[:500]}"
+    )

@@ -220,3 +220,30 @@ def remove_preobfuscated_modules(
         )
 
     module_service.remove_preobfuscated_modules(language)
+
+
+@router.post(
+    "/modules/preobfuscate",
+    status_code=HTTP_202_ACCEPTED,
+    response_class=Response,
+)
+def preobfuscate_specific_modules(
+    module_ids: list[str],
+    background_tasks: BackgroundTasks,
+    module_service: ModuleServiceDep,
+):
+    """Pre-obfuscate specific modules by ID. Runs in the background."""
+    if not module_ids:
+        raise HTTPException(status_code=400, detail="module_ids list must not be empty")
+
+    unique_ids = list(dict.fromkeys(module_ids))
+
+    not_found = [mid for mid in unique_ids if not module_service.get_by_id(mid)]
+    if not_found:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Module(s) not found: {', '.join(not_found[:10])}",
+        )
+
+    for module_id in unique_ids:
+        background_tasks.add_task(module_service.preobfuscate_module_by_id, module_id)

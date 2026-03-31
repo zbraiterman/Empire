@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Added pool health monitoring that warns at 80% capacity
 -   Added `mysql` pytest marker for tests requiring MySQL and Docker
 -   Added performance test suite (`empire/test/test_performance/`) for pool exhaustion and event loop blocking regression testing
+-   Added performance tests for module obfuscation (event loop blocking detection, latency measurement, pre-obfuscation latency)
+-   Added `POST /api/v2/obfuscation/modules/preobfuscate` endpoint for targeted pre-obfuscation of specific modules by ID (runs in background, returns 202)
 -   Added `strict` and `suggested_values` to boolean switch options in modules for better validation and UI hints
 -   Added dynamic `depends_on` options to stagers so dependent fields (e.g. `Bypasses`, `Obfuscate`, `ObfuscateCommand`) are shown/hidden based on the selected listener type
 -   Added `nanodump` BOF module for creating minidumps of the LSASS process using various evasion techniques (handle duplication, process forking, snapshot, seclogon handle leaking)
@@ -57,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Fixed agent staging log messages displaying wrong language (e.g. "Python PUB key" for PowerShell agents, "PS" in C# block) by replacing hardcoded language names with the actual agent language
 -   Fixed incorrect log levels in agent communication: `log.error` for normal conditions (agent not active, agent exiting) downgraded to `log.debug`/`log.info`, `log.info` for invalid data (bad language spec, malformed sysinfo) upgraded to `log.warning`
 -   Fixed typo in SOCKS client error message ("failed to started" -> "failed to start")
+-   Fixed double-obfuscation in PowerShell module script generation — when a module source was already obfuscated (via `get_module_source` or `auto_get_source`), `finalize_module` was re-obfuscating the entire combined script, spawning a redundant PowerShell subprocess per task. `finalize_module` now accepts `script_already_obfuscated` to skip the expensive re-obfuscation while still obfuscating the invoke command (`script_end`).
+-   Fixed obfuscation subprocess (`Invoke-Obfuscation`) running indefinitely with no timeout. Added 300s timeout, process group isolation (`start_new_session`), return code checking, and empty output validation. On failure, gracefully falls back to keyword-obfuscated script with error logging.
 
 ## [6.5.0] - 2026-03-08
 

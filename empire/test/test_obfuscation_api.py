@@ -1,6 +1,7 @@
 import os
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from starlette import status
@@ -266,3 +267,54 @@ def test_preobfuscate_delete(main, client, admin_auth_header, empire_config):
             root_rep = root.replace(str(module_dir), str(obf_module_dir))
             path = Path(root_rep + "/" + file)
             assert not path.exists()
+
+
+def test_preobfuscate_modules_empty_list(client, admin_auth_header):
+    response = client.post(
+        "/api/v2/obfuscation/modules/preobfuscate",
+        headers=admin_auth_header,
+        json=[],
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "must not be empty" in response.json()["detail"]
+
+
+def test_preobfuscate_modules_not_found(client, admin_auth_header):
+    response = client.post(
+        "/api/v2/obfuscation/modules/preobfuscate",
+        headers=admin_auth_header,
+        json=["nonexistent_module_id"],
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "nonexistent_module_id" in response.json()["detail"]
+
+
+def test_preobfuscate_modules_deduplicates(client, admin_auth_header, main):
+    """Duplicate module IDs should be accepted (deduplicated), not rejected."""
+    with patch.object(main.modulesv2, "preobfuscate_module_by_id"):
+        response = client.post(
+            "/api/v2/obfuscation/modules/preobfuscate",
+            headers=admin_auth_header,
+            json=[
+                "powershell_situational_awareness_network_arpscan",
+                "powershell_situational_awareness_network_arpscan",
+            ],
+        )
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+
+
+def test_preobfuscate_modules_valid(client, admin_auth_header, main):
+    with patch.object(main.modulesv2, "preobfuscate_module_by_id") as mock_preobfuscate:
+        response = client.post(
+            "/api/v2/obfuscation/modules/preobfuscate",
+            headers=admin_auth_header,
+            json=["powershell_situational_awareness_network_arpscan"],
+        )
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    mock_preobfuscate.assert_called_once_with(
+        "powershell_situational_awareness_network_arpscan"
+    )
