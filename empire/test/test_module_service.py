@@ -1074,6 +1074,37 @@ def test_preobfuscate_module_by_id_happy_path(module_service):
     mock_obfuscate.assert_called_once()
 
 
+def test_preobfuscate_module_by_id_config_survives_session_close(module_service):
+    """config.command must be readable after the SessionLocal context exits.
+
+    The real get_obfuscation_config returns a session-bound ORM object.
+    With expire_on_commit=True (the default), accessing attributes after
+    the session closes raises DetachedInstanceError — crashing the ASGI
+    background task and preventing all pre-obfuscation.
+    """
+    mock_module = Mock(script_path="test/test.ps1", language="powershell")
+
+    # Replace the mock get_obfuscation_config with the real static method
+    # so it returns a session-bound ORM object (not a transient Mock).
+    original_get_config = module_service.obfuscation_service.get_obfuscation_config
+    module_service.obfuscation_service.get_obfuscation_config = (
+        ObfuscationService.get_obfuscation_config
+    )
+
+    try:
+        with (
+            patch.object(module_service, "get_by_id", return_value=mock_module),
+            patch.object(module_service, "obfuscate_module") as mock_obfuscate,
+        ):
+            # Should NOT raise DetachedInstanceError
+            result = module_service.preobfuscate_module_by_id("test_module")
+
+        assert result is None
+        mock_obfuscate.assert_called_once()
+    finally:
+        module_service.obfuscation_service.get_obfuscation_config = original_get_config
+
+
 # ---------------------------------------------------------------------------
 # obfuscate() timeout fallback
 # ---------------------------------------------------------------------------

@@ -1026,15 +1026,16 @@ class ModuleService:
             config = self.obfuscation_service.get_obfuscation_config(
                 db, module.language
             )
-        if not config:
-            log.error(
-                "Pre-obfuscation: no obfuscation config for language %s",
-                module.language,
-            )
-            return f"No obfuscation config for language: {module.language}"
+            if not config:
+                log.error(
+                    "Pre-obfuscation: no obfuscation config for language %s",
+                    module.language,
+                )
+                return f"No obfuscation config for language: {module.language}"
+            obfuscation_command = config.command
 
         log.info("Pre-obfuscating module %s (%s)", module_id, module.script_path)
-        self.obfuscate_module(source_path, config.command, reobfuscate)
+        self.obfuscate_module(source_path, obfuscation_command, reobfuscate)
         return None
 
     # this is still written in a way that its only used for PowerShell
