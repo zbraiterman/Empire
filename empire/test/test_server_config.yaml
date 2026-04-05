@@ -1,4 +1,6 @@
 suppress_self_cert_warning: true
+obfuscation:
+  timeout: 300
 api:
   port: 1337
 server:

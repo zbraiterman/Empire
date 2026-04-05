@@ -1,4 +1,9 @@
 suppress_self_cert_warning: true
+obfuscation:
+  # Maximum seconds for a single obfuscation subprocess.
+  # Increase for large modules (e.g. PowerView, Mimikatz) on slow hardware.
+  # Set to 0 to disable the timeout entirely.
+  timeout: 300
 api:
   ip: 0.0.0.0
   port: 1337

@@ -30,6 +30,16 @@ Nested settings are deep-merged: overriding `database.mysql.password` in `config
 If using `--config /path/to/config.yaml`, Empire looks for `config.user.yaml` in the same directory as the specified config file.
 
 * **suppress-self-cert-warning** - Suppress the http warnings when launching an Empire instance that uses a self-signed cert.
+* **obfuscation** - Settings for the obfuscation subsystem.
+
+  * **timeout** - Maximum time in seconds allowed for a single PowerShell obfuscation subprocess. Large modules like PowerView (~4000 lines) and Invoke-Mimikatz (~12000 lines) may exceed the default on resource-constrained environments (e.g. single-CPU containers). Set to `0` to disable the timeout entirely. Also settable via the `EMPIRE_OBFUSCATION__TIMEOUT` environment variable.
+
+```yaml
+obfuscation:
+  # Default: 300
+  timeout: 600
+```
+
 * **api** - Configure the RESTful API.
 
 ip - The IP address to bind the API and Starkiller to. port - The port to bind the API and Starkiller to. secure - Enable HTTPS for the API and Starkiller. Browsers will not work with self-signed certs. Uses .key and .pem file from empire/server/data

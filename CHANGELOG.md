@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Added dynamic `depends_on` options to stagers so dependent fields (e.g. `Bypasses`, `Obfuscate`, `ObfuscateCommand`) are shown/hidden based on the selected listener type
 -   Added `nanodump` BOF module for creating minidumps of the LSASS process using various evasion techniques (handle duplication, process forking, snapshot, seclogon handle leaking)
 -   Added multi-language stager support (powershell, csharp, ironpython, go) to UAC bypass privesc modules: `bypassuac`, `bypassuac_env`, `bypassuac_eventvwr`, `bypassuac_sdctlbypass`, `bypassuac_wscript`
+-   Added configurable `obfuscation.timeout` setting (default: 300s, set to 0 to disable) for the PowerShell obfuscation subprocess, settable via `config.yaml` or `EMPIRE_OBFUSCATION__TIMEOUT` env var
 
 ### Changed
 

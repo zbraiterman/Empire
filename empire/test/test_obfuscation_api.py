@@ -1,10 +1,13 @@
 import os
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from starlette import status
+
+from empire.server.core.obfuscation_service import ObfuscationService
 
 
 def test_get_keyword_not_found(client, admin_auth_header):
@@ -318,3 +321,69 @@ def test_preobfuscate_modules_valid(client, admin_auth_header, main):
     mock_preobfuscate.assert_called_once_with(
         "powershell_situational_awareness_network_arpscan"
     )
+
+
+def test_obfuscate_uses_config_timeout():
+    """obfuscate() uses empire_config.obfuscation_timeout as the default timeout."""
+    service = MagicMock(spec=ObfuscationService)
+    service.obfuscate = ObfuscationService.obfuscate.__get__(service)
+    service.main_menu = MagicMock()
+    service.main_menu.install_path = "/tmp/fake"
+    service.obfuscate_keywords = lambda data: data
+    service._convert_obfuscation_command = lambda cmd: cmd
+
+    with patch("empire.server.core.obfuscation_service.empire_config") as mock_config:
+        mock_config.obfuscation.timeout = 999
+        with patch("empire.server.core.obfuscation_service.data_util") as mock_util:
+            mock_util.is_powershell_installed.return_value = True
+            mock_util.get_powershell_name.return_value = "pwsh"
+            with patch("empire.server.core.obfuscation_service.subprocess") as mock_sub:
+                mock_sub.TimeoutExpired = subprocess.TimeoutExpired
+                mock_sub.run.return_value = MagicMock(returncode=0, stderr=b"")
+                service.obfuscate("echo test", "Token\\All\\1")
+                _, kwargs = mock_sub.run.call_args
+                assert kwargs["timeout"] == 999  # noqa: PLR2004
+
+
+def test_obfuscate_explicit_timeout_overrides_config():
+    """An explicit timeout parameter overrides the config value."""
+    service = MagicMock(spec=ObfuscationService)
+    service.obfuscate = ObfuscationService.obfuscate.__get__(service)
+    service.main_menu = MagicMock()
+    service.main_menu.install_path = "/tmp/fake"
+    service.obfuscate_keywords = lambda data: data
+    service._convert_obfuscation_command = lambda cmd: cmd
+
+    with patch("empire.server.core.obfuscation_service.empire_config") as mock_config:
+        mock_config.obfuscation.timeout = 999
+        with patch("empire.server.core.obfuscation_service.data_util") as mock_util:
+            mock_util.is_powershell_installed.return_value = True
+            mock_util.get_powershell_name.return_value = "pwsh"
+            with patch("empire.server.core.obfuscation_service.subprocess") as mock_sub:
+                mock_sub.TimeoutExpired = subprocess.TimeoutExpired
+                mock_sub.run.return_value = MagicMock(returncode=0, stderr=b"")
+                service.obfuscate("echo test", "Token\\All\\1", timeout=42)
+                _, kwargs = mock_sub.run.call_args
+                assert kwargs["timeout"] == 42  # noqa: PLR2004
+
+
+def test_obfuscate_zero_timeout_disables_timeout():
+    """A timeout of 0 (from config) passes None to subprocess (no timeout)."""
+    service = MagicMock(spec=ObfuscationService)
+    service.obfuscate = ObfuscationService.obfuscate.__get__(service)
+    service.main_menu = MagicMock()
+    service.main_menu.install_path = "/tmp/fake"
+    service.obfuscate_keywords = lambda data: data
+    service._convert_obfuscation_command = lambda cmd: cmd
+
+    with patch("empire.server.core.obfuscation_service.empire_config") as mock_config:
+        mock_config.obfuscation.timeout = 0
+        with patch("empire.server.core.obfuscation_service.data_util") as mock_util:
+            mock_util.is_powershell_installed.return_value = True
+            mock_util.get_powershell_name.return_value = "pwsh"
+            with patch("empire.server.core.obfuscation_service.subprocess") as mock_sub:
+                mock_sub.TimeoutExpired = subprocess.TimeoutExpired
+                mock_sub.run.return_value = MagicMock(returncode=0, stderr=b"")
+                service.obfuscate("echo test", "Token\\All\\1")
+                _, kwargs = mock_sub.run.call_args
+                assert kwargs["timeout"] is None

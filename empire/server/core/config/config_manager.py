@@ -64,6 +64,10 @@ class EmpireCompilerConfig(EmpireBaseModel):
     directory: str | None = None
 
 
+class ObfuscationSettings(EmpireBaseModel):
+    timeout: int = Field(default=300, ge=0)
+
+
 class DatabaseDefaultObfuscationConfig(EmpireBaseModel):
     language: str = "powershell"
     enabled: bool = False
@@ -183,6 +187,7 @@ class PluginMarketplaceConfig(EmpireBaseModel):
 
 class EmpireConfig(BaseSettings):
     suppress_self_cert_warning: bool = Field(default=True)
+    obfuscation: ObfuscationSettings = ObfuscationSettings()
     api: ApiConfig = ApiConfig()
     server: ServerConfig = ServerConfig()
     empire_compiler: EmpireCompilerConfig = EmpireCompilerConfig()

@@ -7,6 +7,7 @@ import python_obfuscator
 from python_obfuscator.techniques import one_liner, variable_renamer
 from sqlalchemy.orm import Session
 
+from empire.server.core.config.config_manager import empire_config
 from empire.server.core.db import models
 from empire.server.core.db.base import SessionLocal
 from empire.server.utils import data_util
@@ -86,14 +87,19 @@ class ObfuscationService:
 
         return db_obf_config, None
 
-    def obfuscate(self, ps_script, obfuscation_command, timeout=300):
+    def obfuscate(self, ps_script, obfuscation_command, timeout=None):
         """
         Obfuscate PowerShell scripts using Invoke-Obfuscation.
 
         :param timeout: Maximum seconds for the obfuscation subprocess.
-            Defaults to 300s. On timeout, returns the script with only
-            keyword obfuscation applied (not Invoke-Obfuscation-processed).
+            Defaults to empire_config.obfuscation.timeout (300s out of the box).
+            Set to 0 to disable the timeout entirely.
+            On timeout, returns the script with only keyword obfuscation applied.
         """
+        if timeout is None:
+            timeout = empire_config.obfuscation.timeout
+        if timeout == 0:
+            timeout = None
         if not data_util.is_powershell_installed():
             log.error(
                 "PowerShell is not installed and is required to use obfuscation, please install it first."
