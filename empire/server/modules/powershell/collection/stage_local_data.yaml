@@ -1,0 +1,71 @@
+name: Stage-LocalData
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Stages local data for exfiltration by compressing files or
+  directories into a ZIP archive using PowerShell Compress-Archive.
+  This simulates an adversary collecting and packaging data prior to
+  exfiltration. The compressed archive is saved to a specified
+  location, typically a temp directory.
+software: ''
+tactics: [TA0009]
+techniques: [T1074.001]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '5'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: SourcePath
+    description: >-
+      Path to the file or directory to compress. Supports wildcards.
+    required: true
+    value: ''
+  - name: DestinationPath
+    description: Path for the output ZIP archive.
+    required: false
+    value: '$env:TEMP\staged_data.zip'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Stage-LocalData {
+      param(
+          [string]$SourcePath,
+          [string]$DestinationPath
+      )
+
+      $destFile = $ExecutionContext.InvokeCommand.ExpandString($DestinationPath)
+
+      if (-not $SourcePath) {
+          Write-Output "[-] SourcePath is required."
+          return
+      }
+
+      if (-not (Test-Path $SourcePath)) {
+          Write-Output "[-] Source path not found: $SourcePath"
+          return
+      }
+
+      try {
+          Compress-Archive -Path $SourcePath -DestinationPath $destFile -Force
+          $fileInfo = Get-Item $destFile
+          Write-Output "[+] Data staged successfully."
+          Write-Output "[+] Source: $SourcePath"
+          Write-Output "[+] Archive: $destFile"
+          Write-Output "[+] Size: $($fileInfo.Length) bytes"
+      } catch {
+          Write-Output "[-] Failed to compress data: $_"
+      }
+  }
+script_end: Stage-LocalData -SourcePath "{{ SourcePath }}" -DestinationPath "{{ DestinationPath
+  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

