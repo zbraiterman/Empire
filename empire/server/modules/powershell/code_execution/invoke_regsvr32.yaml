@@ -24,7 +24,7 @@ comments:
 options:
   - name: Method
     description: Execution method to use.
-    required: false
+    required: true
     value: 'remote_sct'
     suggested_values:
       - remote_sct
@@ -34,11 +34,16 @@ options:
     description: URL to remote SCT scriptlet file.
     required: false
     value: ''
+    depends_on:
+      - name: Method
+        values: ['remote_sct']
   - name: LocalFile
-    description: >-
-      Path to local SCT or DLL file.
+    description: Path to local SCT or DLL file.
     required: false
     value: ''
+    depends_on:
+      - name: Method
+        values: ['local_sct', 'local_dll']
   - name: OutputFunction
     description: PowerShell output function to use.
     required: false
@@ -93,5 +98,4 @@ script: |
           }
       }
   }
-script_end: Invoke-Regsvr32 -Method "{{ Method }}" -ScriptletUrl "{{ ScriptletUrl
-  }}" -LocalFile "{{ LocalFile }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Invoke-Regsvr32 {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

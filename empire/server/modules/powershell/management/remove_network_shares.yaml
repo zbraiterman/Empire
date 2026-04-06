@@ -25,7 +25,7 @@ options:
   - name: Method
     description: >-
       Method to use (disconnect_all, remove_share, disable_admin, remove_admin_shares).
-    required: false
+    required: true
     value: 'disconnect_all'
     suggested_values:
       - disconnect_all
@@ -33,10 +33,12 @@ options:
       - disable_admin
       - remove_admin_shares
   - name: ShareName
-    description: >-
-      Name of the share to remove (used with remove_share method).
+    description: Name of the share to remove (remove_share method only).
     required: false
     value: ''
+    depends_on:
+      - name: Method
+        values: ['remove_share']
   - name: OutputFunction
     description: PowerShell output function to use.
     required: false
@@ -90,5 +92,4 @@ script: |
           }
       }
   }
-script_end: Remove-NetworkShares -Method "{{ Method }}" -ShareName "{{ ShareName
-  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Remove-NetworkShares {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

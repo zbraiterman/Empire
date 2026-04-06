@@ -28,7 +28,7 @@ options:
     value: 'https://raw.githubusercontent.com/redcanaryco/atomic-red-team/master/atomics/T1197/T1197.md'
   - name: LocalPath
     description: Local path to save the downloaded file.
-    required: false
+    required: true
     value: '$env:TEMP\bits_download.txt'
   - name: JobName
     description: Name for the BITS job.
@@ -38,15 +38,17 @@ options:
     description: >-
       BITS method (download for simple transfer, persist for notification command
       execution).
-    required: false
+    required: true
     value: 'download'
     suggested_values:
       - download
       - persist
   - name: NotifyCommand
-    description: >-
-      Command to execute when BITS job completes (persist method only).
+    description: Command to execute when BITS job completes (persist method only).
     required: false
+    depends_on:
+      - name: Method
+        values: ['persist']
     value: 'C:\Windows\system32\notepad.exe'
   - name: OutputFunction
     description: PowerShell output function to use.
@@ -102,6 +104,4 @@ script: |
           }
       }
   }
-script_end: Invoke-BitsTransfer -RemoteUrl "{{ RemoteUrl }}" -LocalPath "{{ LocalPath
-  }}" -JobName "{{ JobName }}" -Method "{{ Method }}" -NotifyCommand "{{ NotifyCommand
-  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Invoke-BitsTransfer {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

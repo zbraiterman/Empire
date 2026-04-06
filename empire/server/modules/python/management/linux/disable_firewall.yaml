@@ -22,7 +22,7 @@ comments:
 options:
   - name: Method
     description: Firewall to disable (all, iptables, ufw, firewalld).
-    required: false
+    required: true
     value: 'all'
     suggested_values:
       - all
@@ -37,8 +37,14 @@ script: |
 
   def try_cmd(cmd, desc):
       try:
-          output = run_command(cmd)
-          results.append('[+] {}: {}'.format(desc, output.strip() if output.strip() else 'OK'))
+          proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          output, stderr = proc.communicate()
+          output = output.decode('utf-8', errors='replace')
+          stderr = stderr.decode('utf-8', errors='replace')
+          if proc.returncode != 0:
+              results.append('[-] {}: failed (exit {}): {}'.format(desc, proc.returncode, stderr.strip() or output.strip()))
+          else:
+              results.append('[+] {}: {}'.format(desc, output.strip() if output.strip() else 'OK'))
       except Exception as e:
           results.append('[-] {}: {}'.format(desc, str(e)))
 

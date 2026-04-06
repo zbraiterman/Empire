@@ -25,11 +25,11 @@ comments:
 options:
   - name: JavaScriptCode
     description: JavaScript source code to compile.
-    required: false
-    value: 'print("Hello from jsc.exe compiled JavaScript");'
+    required: true
+    value: "import System; Console.WriteLine('Hello from jsc.exe compiled JavaScript');"
   - name: OutputPath
     description: Output path for the compiled executable.
-    required: false
+    required: true
     value: '$env:TEMP\jsc_output.exe'
   - name: OutputType
     description: Output type (exe or library).
@@ -40,15 +40,16 @@ options:
       - library
   - name: JscPath
     description: Path to jsc.exe.
-    required: false
+    required: true
     value: 'C:\Windows\Microsoft.NET\Framework\v4.0.30319\jsc.exe'
   - name: Execute
-    description: Execute the compiled output (true/false).
+    description: Execute the compiled output.
     required: false
-    value: 'true'
+    value: 'True'
+    strict: true
     suggested_values:
-      - 'true'
-      - 'false'
+      - 'True'
+      - 'False'
   - name: OutputFunction
     description: PowerShell output function to use.
     required: false
@@ -63,7 +64,7 @@ script: |
           [string]$OutputPath,
           [string]$OutputType = "exe",
           [string]$JscPath,
-          [string]$Execute = "true"
+          [switch]$Execute
       )
 
       $outPath = $ExecutionContext.InvokeCommand.ExpandString($OutputPath)
@@ -76,25 +77,33 @@ script: |
 
       # Write JavaScript to temp file
       $jsFile = "$env:TEMP\jsc_temp_$(Get-Random).js"
-      $JavaScriptCode | Out-File -FilePath $jsFile -Encoding ASCII
-      Write-Output "[+] Wrote JavaScript to: $jsFile"
+      try {
+          [System.IO.File]::WriteAllText($jsFile, $JavaScriptCode)
+          Write-Output "[+] Wrote JavaScript to: $jsFile"
+      } catch {
+          Write-Output "[-] Failed to write temp JavaScript file: $_"
+          return
+      }
 
       # Build jsc.exe arguments
-      $args = @()
+      $jscArgs = @()
       if ($OutputType -eq "library") {
-          $args += "/t:library"
+          $jscArgs += "/t:library"
       }
-      $args += "/out:`"$outPath`""
-      $args += "`"$jsFile`""
+      $jscArgs += "/out:`"$outPath`""
+      $jscArgs += "`"$jsFile`""
 
       Write-Output "[*] Compiling with jsc.exe..."
-      $result = & $JscPath $args 2>&1
+      $result = & $JscPath $jscArgs 2>&1
+      if ($LASTEXITCODE -ne 0) {
+          Write-Output "[-] jsc.exe exited with code $LASTEXITCODE"
+      }
       Write-Output $result
 
       if (Test-Path $outPath) {
           Write-Output "[+] Compiled output: $outPath"
 
-          if ($Execute.ToLower() -eq "true" -and $OutputType -eq "exe") {
+          if ($Execute -and $OutputType -eq "exe") {
               Write-Output "[*] Executing compiled output..."
               $execResult = & $outPath 2>&1
               Write-Output $execResult
@@ -104,8 +113,6 @@ script: |
       }
 
       # Cleanup temp JS file
-      Remove-Item $jsFile -Force -ErrorAction SilentlyContinue
+      try { Remove-Item $jsFile -Force } catch { Write-Output "[!] Warning: failed to clean up temp file $jsFile" }
   }
-script_end: Invoke-Jsc -JavaScriptCode '{{ JavaScriptCode }}' -OutputPath "{{ OutputPath
-  }}" -OutputType "{{ OutputType }}" -JscPath "{{ JscPath }}" -Execute "{{ Execute
-  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Invoke-Jsc {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

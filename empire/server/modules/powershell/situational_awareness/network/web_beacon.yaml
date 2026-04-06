@@ -57,5 +57,4 @@ script: |
           Write-Output "[-] Request failed: $_"
       }
   }
-script_end: Invoke-WebBeacon -Url "{{ Url }}" -UserAgent "{{ UserAgent }}" {{ PARAMS
-  }} | {{ OUTPUT_FUNCTION }}
+script_end: Invoke-WebBeacon {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

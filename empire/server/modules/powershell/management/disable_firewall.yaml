@@ -23,7 +23,7 @@ comments:
 options:
   - name: Method
     description: Method to use for disabling the firewall.
-    required: false
+    required: true
     value: 'netsh'
     suggested_values:
       - netsh
@@ -67,5 +67,4 @@ script: |
           }
       }
   }
-script_end: Disable-Firewall -Method {{ Method }} {{ PARAMS }} | {{ OUTPUT_FUNCTION
-  }}
+script_end: Disable-Firewall {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

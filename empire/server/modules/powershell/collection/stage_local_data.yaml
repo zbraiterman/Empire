@@ -28,7 +28,7 @@ options:
     value: ''
   - name: DestinationPath
     description: Path for the output ZIP archive.
-    required: false
+    required: true
     value: '$env:TEMP\staged_data.zip'
   - name: OutputFunction
     description: PowerShell output function to use.
@@ -67,5 +67,4 @@ script: |
           Write-Output "[-] Failed to compress data: $_"
       }
   }
-script_end: Stage-LocalData -SourcePath "{{ SourcePath }}" -DestinationPath "{{ DestinationPath
-  }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Stage-LocalData {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

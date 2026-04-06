@@ -24,7 +24,7 @@ comments:
 options:
   - name: Method
     description: Signed script to use for proxy execution.
-    required: false
+    required: true
     value: 'syncappv'
     suggested_values:
       - syncappv
@@ -79,5 +79,4 @@ script: |
           }
       }
   }
-script_end: Invoke-SignedScript -Method "{{ Method }}" -Command "{{ Command }}" {{
-  PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Invoke-SignedScript {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

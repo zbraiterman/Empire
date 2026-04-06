@@ -30,7 +30,7 @@ options:
     description: >-
       Method to use for hiding (attrib, powershell, registry). Registry method hides
       all hidden files globally.
-    required: false
+    required: true
     value: 'attrib'
     suggested_values:
       - attrib
@@ -81,5 +81,4 @@ script: |
           }
       }
   }
-script_end: Hide-Artifacts -FilePath "{{ FilePath }}" -Method "{{ Method }}" {{ PARAMS
-  }} | {{ OUTPUT_FUNCTION }}
+script_end: Hide-Artifacts {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

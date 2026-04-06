@@ -25,7 +25,7 @@ options:
     description: >-
       Method to use (usn_delete to delete the USN journal, zero_data to zero file
       data).
-    required: false
+    required: true
     value: 'usn_delete'
     suggested_values:
       - usn_delete
@@ -34,15 +34,23 @@ options:
     description: Drive letter for USN journal deletion.
     required: false
     value: 'C:'
+    depends_on:
+      - name: Method
+        values: ['usn_delete']
   - name: FilePath
-    description: >-
-      File path for zero_data method. Required when Method is zero_data.
+    description: File path for zero_data method.
     required: false
     value: ''
+    depends_on:
+      - name: Method
+        values: ['zero_data']
   - name: DataLength
     description: Number of bytes to zero for zero_data method.
     required: false
     value: '10'
+    depends_on:
+      - name: Method
+        values: ['zero_data']
   - name: OutputFunction
     description: PowerShell output function to use.
     required: false
@@ -84,6 +92,4 @@ script: |
           }
       }
   }
-script_end: Invoke-FSUtilIndicatorRemoval -Method "{{ Method }}" -Drive "{{ Drive
-  }}" -FilePath "{{ FilePath }}" -DataLength "{{ DataLength }}" {{ PARAMS }} | {{
-  OUTPUT_FUNCTION }}
+script_end: Invoke-FSUtilIndicatorRemoval {{ PARAMS }} | {{ OUTPUT_FUNCTION }}
