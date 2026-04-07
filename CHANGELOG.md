@@ -84,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Added Python linux_keyring module for credential extraction from the Linux kernel keyring subsystem
 -   Added Python aws_imds module for AWS IAM role credential theft via EC2 Instance Metadata Service
 -   Added BOF `spawn` module for EarlyBird process hollowing with suspended process creation, shellcode injection, and APC thread hijacking
+-   Agent "got results" log message now includes the task ID for easier post-mortem correlation
 
 ### Changed
 

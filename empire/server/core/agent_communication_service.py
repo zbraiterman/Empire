@@ -1107,7 +1107,7 @@ class AgentCommunicationService:
         )
 
         # report the agent result in the reporting database
-        message = f"Agent {session_id} got results"
+        message = f"Agent {session_id} got results for task {task_id}"
         log.info(message)
 
         tasking = (
