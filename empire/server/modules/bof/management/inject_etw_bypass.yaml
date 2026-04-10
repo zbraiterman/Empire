@@ -1,0 +1,34 @@
+name: inject_etw_bypass
+authors:
+  - name: boku
+    handle: '@0xBoku'
+    link: https://github.com/boku7
+description: |
+  Beacon Object File (BOF) that injects an ETW bypass into a remote process
+  using syscalls (HellsGate/HalosGate). Patches EtwEventWrite in the target
+  process to blind ETW-based security logging and monitoring. x64 only.
+software: ''
+tactics: [TA0005]
+techniques: [T1562.001]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: bof
+min_language_version: ''
+comments:
+  - https://github.com/sliverarmory/injectEtwBypass
+options:
+  - name: Pid
+    description: Process ID of the remote process to inject the ETW bypass into.
+    required: true
+    value: ''
+bof:
+  x86: ''
+  x64: bof/injectEtwBypass/injectEtwBypass.x64.o
+  entry_point: ''
+  format_string: i
+script_path: ''
+script_end: ''
+advanced:
+  custom_generate: true

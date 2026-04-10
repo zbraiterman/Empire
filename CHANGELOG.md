@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Added `strict` and `suggested_values` to boolean switch options in modules for better validation and UI hints
 -   Added dynamic `depends_on` options to stagers so dependent fields (e.g. `Bypasses`, `Obfuscate`, `ObfuscateCommand`) are shown/hidden based on the selected listener type
 -   Added `nanodump` BOF module for creating minidumps of the LSASS process using various evasion techniques (handle duplication, process forking, snapshot, seclogon handle leaking)
+-   Added 7 new BOF modules sourced from Sliver Armory for defense evasion and credential access:
+    -   `unhook` — refresh DLLs to remove EDR/AV API hooks (T1562.001)
+    -   `patchit` — all-in-one AMSI + ETW patch/check/revert (T1562.001)
+    -   `inject_amsi_bypass` — AMSI bypass in a remote process via syscalls (T1562.001)
+    -   `inject_etw_bypass` — ETW bypass in a remote process via syscalls (T1562.001)
+    -   `credman` — dump Windows Credential Manager via SeTrustedCredManAccess (T1555.004)
+    -   `handlekatz` — LSASS dump via handle duplication to evade handle-based detection (T1003.001)
+    -   `bofroast` — Kerberoasting as a BOF without .NET CLR dependency (T1558.003)
 -   Added multi-language stager support (powershell, csharp, ironpython, go) to UAC bypass privesc modules: `bypassuac`, `bypassuac_env`, `bypassuac_eventvwr`, `bypassuac_sdctlbypass`, `bypassuac_wscript`
 -   Added configurable `obfuscation.timeout` setting (default: 300s, set to 0 to disable) for the PowerShell obfuscation subprocess, settable via `config.yaml` or `EMPIRE_OBFUSCATION__TIMEOUT` env var
 

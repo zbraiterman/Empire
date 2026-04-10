@@ -1,0 +1,45 @@
+name: unhook
+authors:
+  - name: Raphael Mudge
+    handle: ''
+    link: https://github.com/rsmudge
+description: |
+  Beacon Object File (BOF) that refreshes DLLs in the current process to remove
+  API hooks placed by EDR/AV products. Works by reading clean copies of DLLs from
+  disk and overwriting the hooked .text sections in memory. Based on Cylance's
+  Universal Unhooking research. Optionally accepts a comma-separated list of modules
+  to skip (e.g., the stomped module from a C2 profile).
+software: ''
+tactics: [TA0005]
+techniques: [T1562.001]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: bof
+min_language_version: ''
+comments:
+  - https://github.com/Cylance/UnhookingPOC
+options:
+  - name: Architecture
+    description: Architecture of the BOF to generate with (x64 or x86).
+    required: true
+    value: x64
+    strict: true
+    suggested_values:
+      - x64
+      - x86
+  - name: SkipModules
+    description: Comma-separated list of DLL module names to skip (not unhook). Leave
+      empty to refresh all hooked DLLs.
+    required: false
+    value: ''
+bof:
+  x86: bof/unhook/unhook.x86.o
+  x64: bof/unhook/unhook.x64.o
+  entry_point: ''
+  format_string: z
+script_path: ''
+script_end: ''
+advanced:
+  custom_generate: true
