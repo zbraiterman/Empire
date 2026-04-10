@@ -1,0 +1,103 @@
+name: Set-ScreensaverPersistence
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Establishes persistence by dropping a .vbs wrapper that Shell()s an
+  Empire launcher hidden, then registering wscript.exe with that .vbs
+  path as the Windows screensaver via SCRNSAVE.EXE. wscript.exe is a
+  GUI-subsystem binary, so activation does not flash a console window.
+  When the screensaver fires after the idle timeout (or in /p preview
+  mode), Windows runs wscript, which executes the .vbs, which in turn
+  launches the payload hidden.
+
+  Modifies registry values under HKCU\Control Panel\Desktop to enable
+  the screensaver, set the idle timeout, and register SCRNSAVE.EXE.
+  Original values are saved to HKCU:\Software\Empire\ScreensaverBackup
+  so Cleanup can restore them. On verify failure the install path
+  rolls back all mutated registry values and deletes the .vbs.
+software: ''
+tactics: [TA0003]
+techniques: [T1546.002]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Listener
+    description: Listener to use for the stager.
+    required: true
+    value: ''
+  - name: Language
+    description: Language of the stager to generate.
+    required: true
+    value: powershell
+    strict: true
+    suggested_values:
+      - powershell
+      - csharp
+      - ironpython
+      - go
+  - name: ScriptPath
+    description: >-
+      Path where the VBS launcher wrapper will be written. Must end in .vbs so wscript.exe
+      selects the VBScript engine.
+    required: true
+    value: '$env:APPDATA\screensaver.vbs'
+  - name: Timeout
+    description: Idle timeout in seconds before the screensaver activates.
+    required: false
+    value: '300'
+  - name: Obfuscate
+    description: Obfuscate the launcher powershell code.
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - True
+      - False
+    depends_on:
+      - name: Language
+        values: ['powershell']
+  - name: ObfuscateCommand
+    description: The Invoke-Obfuscation command to use.
+    required: false
+    value: Token\All\1
+    depends_on:
+      - name: Language
+        values: ['powershell']
+      - name: Obfuscate
+        values: ['True']
+  - name: Bypasses
+    description: Bypasses as a space separated list to be prepended to the launcher.
+    required: false
+    value: ''
+  - name: UserAgent
+    description: User-agent string to use for the staging request (default, none,
+      or other).
+    required: false
+    value: default
+  - name: Proxy
+    description: Proxy to use for request (default, none, or other).
+    required: false
+    value: default
+  - name: ProxyCreds
+    description: Proxy credentials ([domain\]username:password) to use for request
+      (default, none, or other).
+    required: false
+    value: default
+  - name: Cleanup
+    description: Remove the persistence mechanism and restore screensaver settings.
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - True
+      - False
+advanced:
+  custom_generate: true
