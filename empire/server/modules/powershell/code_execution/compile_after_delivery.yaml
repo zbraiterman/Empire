@@ -1,0 +1,49 @@
+name: Compile-After-Delivery
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Write C# source code to disk, compile with csc.exe, and execute the
+  resulting binary. This implements the Compile After Delivery
+  technique where source code is delivered to the target and compiled
+  locally, avoiding detection of pre-compiled malicious binaries. The
+  .NET Framework csc.exe compiler is used, which is present on all
+  modern Windows systems. This technique is used by various threat
+  actors to evade static file analysis and signature-based detection.
+software: ''
+tactics: [TA0005]
+techniques: [T1027.004]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: CSharpCode
+    description: >-
+      C# source code to compile and execute. Must contain a Main method or be a complete
+      program. The code is inlined into the generated script, so embedded double
+      quotes are safe.
+    required: true
+    value: 'using System; class Program { static void Main() { Console.WriteLine("Compile_After_Delivery_Success");
+      } }'
+  - name: OutputPath
+    description: >-
+      Path for the compiled executable. Defaults to a temp directory location.
+    required: false
+    value: '$env:TEMP\compiled_payload.exe'
+  - name: Execute
+    description: Execute the compiled binary after compilation. Set to False for
+      compile-only.
+    required: false
+    value: 'True'
+    strict: true
+    suggested_values:
+      - True
+      - False
+advanced:
+  custom_generate: true

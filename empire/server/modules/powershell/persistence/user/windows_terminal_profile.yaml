@@ -1,0 +1,94 @@
+name: Windows-Terminal-Profile
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Establish persistence by injecting an Empire launcher into the Windows
+  Terminal settings.json. The settings.json profile supports a commandline
+  field that specifies the executable to run when a new tab is opened. By
+  dropping a listener launcher into the default profile's commandline,
+  adversaries achieve user-level persistence that triggers whenever the
+  user opens Windows Terminal. The payload is wrapped in cmd.exe /c so
+  the legitimate shell still loads after the payload fires, preserving
+  interactive use and minimising suspicion.
+
+  Note: the module round-trips settings.json through ConvertFrom-Json /
+  ConvertTo-Json. On Windows PowerShell 5.1 this strips any JSONC
+  comments the user had in their settings. A backup is saved next to
+  settings.json as settings.json.empire.bak for manual recovery.
+software: ''
+tactics: [TA0003, TA0004]
+techniques: [T1547.015]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Listener
+    description: Listener to use.
+    required: true
+    value: ''
+  - name: Language
+    description: Language of the stager to generate.
+    required: true
+    value: powershell
+    strict: true
+    suggested_values:
+      - powershell
+      - csharp
+      - ironpython
+      - go
+  - name: ProfileName
+    description: >-
+      Optional profile name substring to target. If empty, targets the defaultProfile,
+      falling back to the first profile in the list. Named ProfileName to avoid collision
+      with PowerShell's $Profile automatic variable.
+    required: false
+    value: ''
+  - name: Obfuscate
+    description: Obfuscate the launcher powershell code, uses the ObfuscateCommand
+      for obfuscation types.
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - True
+      - False
+    depends_on:
+      - name: Language
+        values: ['powershell']
+  - name: ObfuscateCommand
+    description: The Invoke-Obfuscation command to use.
+    required: false
+    value: Token\All\1
+    depends_on:
+      - name: Language
+        values: ['powershell']
+      - name: Obfuscate
+        values: ['True']
+  - name: Bypasses
+    description: Bypasses as a space separated list to be prepended to the launcher.
+    required: false
+    value: ''
+  - name: UserAgent
+    description: User-agent string to use for the staging request (default, none,
+      or other).
+    required: false
+    value: default
+  - name: Proxy
+    description: Proxy to use for request (default, none, or other).
+    required: false
+    value: default
+  - name: ProxyCreds
+    description: Proxy credentials ([domain\]username:password) to use for request
+      (default, none, or other).
+    required: false
+    value: default
+script_path: persistence/Set-WindowsTerminalProfile.ps1
+advanced:
+  custom_generate: true
