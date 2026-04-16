@@ -1039,13 +1039,14 @@ class AgentCommunicationService:
         Takes a sessionID and posted encrypted data response, decrypt
         everything and handle results as appropriate.
         """
-        if session_id not in self.agents:
+        cached_agent = self.agents.get(session_id)
+        if cached_agent is None:
             message = f"handle_agent_response(): sessionID {session_id} not in cache"
             log.error(message)
             return None
 
         # extract the agent's session key
-        sessionKey = self.agents[session_id]["sessionKey"]
+        sessionKey = cached_agent["sessionKey"]
         with contextlib.suppress(Exception):
             sessionKey = bytes.fromhex(sessionKey)
 
