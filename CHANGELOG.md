@@ -78,6 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [6.5.0] - 2026-03-08
 
+## [6.5.0] - 2026-03-08
+-   Updated Starkiller to v3.4.0
+
 ### Added
 
 -   Log Empire version and git commit SHA at startup for easier production diagnostics; commit SHA is baked into the Docker image at build time via `--build-arg`
@@ -159,6 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Added T1562.001 (Impair Defenses) to AMSI bypass, ETW patching, and Outlook security modules
 -   Fixed duplicate technique entries in RevertToSelf and NetRipper modules
 -   Fixed PSRansom module `name` field incorrectly set to `Invoke-Script` instead of `PSRansom`
+-   Fixed misc_skeleton_key Invoke-Mimikatz call
 
 ## [6.4.1] - 2026-02-15
 
