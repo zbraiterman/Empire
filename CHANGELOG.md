@@ -137,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Fixed malleable HTTP listener stagers failing after server restart due to random URI regeneration in `Stager._defaults()`
 -   Fix null-safety bug in `_process_agent_packet` when `save_module_file` returns None on skywalker exploit detection
 -   Fixed stop-job handlers in PowerShell and Python agents crashing when the target job doesn't exist
+-   Fixed powerview add-netuser
 -   Fixed the `docs/quickstart/installation/README.md` file to specify a previously missing reference to Ubuntu
 -   Fixed 9 malformed MITRE ATT&CK technique IDs across PowerShell, Python, and C# modules
 -   Fixed 2 malformed tactic fields that used space-separated strings instead of YAML lists
