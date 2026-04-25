@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   **Security** in case of vulnerabilities.
 
 ## [Unreleased]
+
+## [6.6.0] - 2026-04-25
+
 -   Fixed background jobs for the python agent.
 
 ### Added
@@ -79,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [6.5.0] - 2026-03-08
 
 ## [6.5.0] - 2026-03-08
+
 -   Updated Starkiller to v3.4.0
 
 ### Added
@@ -1379,7 +1383,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Updated shellcoderdi to newest version (@Cx01N)
 -   Added a Nim launcher (@Hubbl3)
 
-[Unreleased]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.5.0...HEAD
+[Unreleased]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.6.0...HEAD
+
+[6.6.0]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.5.0...v6.6.0
 
 [6.5.0]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.4.1...v6.5.0
 
