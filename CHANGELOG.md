@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   **Security** in case of vulnerabilities.
 
 ## [Unreleased]
--   Fixed background jobs for the python agent.
+
+## [6.6.0] - 2026-04-25
+
 
 ### Added
 
@@ -75,10 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Fixed typo in SOCKS client error message ("failed to started" -> "failed to start")
 -   Fixed double-obfuscation in PowerShell module script generation — when a module source was already obfuscated (via `get_module_source` or `auto_get_source`), `finalize_module` was re-obfuscating the entire combined script, spawning a redundant PowerShell subprocess per task. `finalize_module` now accepts `script_already_obfuscated` to skip the expensive re-obfuscation while still obfuscating the invoke command (`script_end`).
 -   Fixed obfuscation subprocess (`Invoke-Obfuscation`) running indefinitely with no timeout. Added 300s timeout, process group isolation (`start_new_session`), return code checking, and empty output validation. On failure, gracefully falls back to keyword-obfuscated script with error logging.
+-   Fixed background jobs for the python agent.
 
 ## [6.5.0] - 2026-03-08
 
 ## [6.5.0] - 2026-03-08
+
 -   Updated Starkiller to v3.4.0
 
 ### Added
@@ -1379,7 +1383,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -   Updated shellcoderdi to newest version (@Cx01N)
 -   Added a Nim launcher (@Hubbl3)
 
-[Unreleased]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.5.0...HEAD
+[Unreleased]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.6.0...HEAD
+
+[6.6.0]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.5.0...v6.6.0
 
 [6.5.0]: https://github.com/BC-SECURITY/Empire-Sponsors/compare/v6.4.1...v6.5.0
 
