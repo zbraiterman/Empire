@@ -1,0 +1,94 @@
+name: System-Language
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Discovers system language and locale settings on a Windows target.
+  Collects information using multiple methods including
+  Get-WinSystemLocale, chcp (code page), WMIC OS locale query,
+  registry locale values, PowerShell culture info, and DISM
+  international settings. This information is commonly gathered by
+  ransomware and other malware to determine whether to execute based
+  on the victim's geographic location.
+software: ''
+tactics: [TA0007]
+techniques: [T1614.001]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: true
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Get-SystemLanguage {
+      $results = @()
+      $results += "=== System Language Discovery ==="
+      $results += ""
+
+      # Method 1: Get-WinSystemLocale
+      try {
+          $locale = Get-WinSystemLocale
+          $results += "[+] System Locale: $($locale.Name) - $($locale.DisplayName)"
+      } catch {
+          $results += "[-] Get-WinSystemLocale not available."
+      }
+
+      # Method 2: chcp
+      try {
+          $chcp = cmd /c chcp 2>&1
+          $results += "[+] Code Page (chcp): $chcp"
+      } catch {
+          $results += "[-] chcp failed."
+      }
+
+      # Method 3: Registry
+      try {
+          $regLocale = reg query "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Nls\Language" 2>&1
+          $results += "[+] Registry NLS Language:"
+          $results += $regLocale
+      } catch {
+          $results += "[-] Registry query failed."
+      }
+
+      # Method 4: PowerShell Culture Info
+      try {
+          $info = @{
+              UILanguage     = Get-WinUILanguageOverride
+              UserLanguages  = (Get-WinUserLanguageList).LanguageTag -join ', '
+              SystemLocale   = Get-WinSystemLocale
+              CurrentCulture = [System.Globalization.CultureInfo]::CurrentCulture.Name
+              CurrentUICulture = [System.Globalization.CultureInfo]::CurrentUICulture.Name
+              TimeZone       = (Get-TimeZone).Id
+          }
+          $results += "[+] PowerShell Culture Info:"
+          $info.GetEnumerator() | ForEach-Object {
+              $results += "    $($_.Name): $($_.Value)"
+          }
+      } catch {
+          $results += "[-] PowerShell culture info partially unavailable."
+          $results += "    CurrentCulture: $([System.Globalization.CultureInfo]::CurrentCulture.Name)"
+      }
+
+      # Method 5: WMIC
+      try {
+          $wmic = cmd /c "wmic os get Locale,OSLanguage,MUILanguages /format:list" 2>&1
+          $results += "[+] WMIC OS Language Info:"
+          $results += $wmic
+      } catch {
+          $results += "[-] WMIC query failed."
+      }
+
+      $results -join "`n"
+  }
+script_end: Get-SystemLanguage {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

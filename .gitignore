@@ -19,6 +19,7 @@ empire/server/api/static/*
 empire/server/api/v2/starkiller-temp
 empire/server/api/v2/starkiller
 empire/server/Empire-Compiler
+loader.bin
 
 # client
 empire/client/generated-stagers/*

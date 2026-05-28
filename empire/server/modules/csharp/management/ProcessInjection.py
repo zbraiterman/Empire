@@ -10,6 +10,7 @@ from empire.server.common.empire import MainMenu
 from empire.server.core.db.base import SessionLocal
 from empire.server.core.exceptions import ModuleExecutionException
 from empire.server.core.module_models import EmpireModule
+from empire.server.utils.donut_util import donut_create
 
 
 class Module:
@@ -80,7 +81,7 @@ class Module:
                     "module donut-shellcode not installed. It is only supported on x86."
                 )
 
-            shellcode = donut.create(file=str(launcher), arch=arch_type)
+            shellcode = donut_create(file=str(launcher), arch=arch_type)
             base64_shellcode = base64.b64encode(shellcode).decode("UTF-8")
 
         technique_map = {

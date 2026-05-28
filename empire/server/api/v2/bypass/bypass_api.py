@@ -40,7 +40,7 @@ router = APIRouter(
 )
 
 
-async def get_bypass(
+def get_bypass(
     uid: int,
     db: CurrentSession,
     bypass_service: BypassServiceDep,
@@ -57,12 +57,12 @@ BypassDep = Annotated[models.Bypass, Depends(get_bypass)]
 
 
 @router.get("/{uid}", response_model=Bypass)
-async def read_bypass(uid: int, db_bypass: BypassDep):
+def read_bypass(uid: int, db_bypass: BypassDep):
     return domain_to_dto_bypass(db_bypass)
 
 
 @router.get("/", response_model=Bypasses)
-async def read_bypasses(
+def read_bypasses(
     db: CurrentSession,
     bypass_service: BypassServiceDep,
     default: bool | None = None,
@@ -74,7 +74,7 @@ async def read_bypasses(
 
 
 @router.post("/", status_code=201, response_model=Bypass)
-async def create_bypass(
+def create_bypass(
     bypass_req: BypassPostRequest,
     db: CurrentSession,
     bypass_service: BypassServiceDep,
@@ -88,7 +88,7 @@ async def create_bypass(
 
 
 @router.put("/{uid}", response_model=Bypass)
-async def update_bypass(
+def update_bypass(
     uid: int,
     bypass_req: BypassUpdateRequest,
     db: CurrentSession,
@@ -104,7 +104,7 @@ async def update_bypass(
 
 
 @router.delete("/{uid}", status_code=HTTP_204_NO_CONTENT, response_class=Response)
-async def delete_bypass(
+def delete_bypass(
     uid: str,
     db: CurrentSession,
     db_bypass: BypassDep,
@@ -114,11 +114,11 @@ async def delete_bypass(
 
 
 @router.post("/reset", status_code=HTTP_204_NO_CONTENT, response_class=Response)
-async def reset_bypasses(db: CurrentSession, bypass_service: BypassServiceDep):
+def reset_bypasses(db: CurrentSession, bypass_service: BypassServiceDep):
     bypass_service.delete_all_bypasses(db)
     bypass_service.load_bypasses(db)
 
 
 @router.post("/reload", status_code=HTTP_204_NO_CONTENT, response_class=Response)
-async def reload_bypasses(db: CurrentSession, bypass_service: BypassServiceDep):
+def reload_bypasses(db: CurrentSession, bypass_service: BypassServiceDep):
     bypass_service.load_bypasses(db)

@@ -37,7 +37,7 @@ router = APIRouter(
 )
 
 
-async def get_agent(
+def get_agent(
     agent_id: str,
     db: CurrentSession,
     agent_service: AgentServiceDep,
@@ -53,7 +53,7 @@ async def get_agent(
 AgentDep = Annotated[models.Agent, Depends(get_agent)]
 
 
-async def get_file(
+def get_file(
     uid: int,
     db: CurrentSession,
     db_agent: AgentDep,
@@ -75,7 +75,7 @@ FileDep = Annotated[
 
 
 @router.get("/root")
-async def read_file_root(
+def read_file_root(
     db: CurrentSession,
     db_agent: AgentDep,
     agent_file_service: AgentFileServiceDep,
@@ -91,7 +91,7 @@ async def read_file_root(
 
 
 @router.get("/{uid}", response_model=AgentFile)
-async def read_file(
+def read_file(
     uid: int,
     db_agent: AgentDep,
     db_file: FileDep,

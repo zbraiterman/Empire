@@ -1,16 +1,30 @@
 #!/bin/bash
 
 INSTALL=0
+TEST=0
 YES_OPTION=""
 FORCE_OPTION=""
 OVERRIDE_OPTION=""
 COMPILE_OPTION=""
 EMPIRE_ARGS=()
+TEST_ARGS=()
+
+# Once we see "test", all remaining args go to pytest
+COLLECTING_TEST_ARGS=0
 
 for arg in "$@"; do
+  if [ $COLLECTING_TEST_ARGS -eq 1 ]; then
+    TEST_ARGS+=("$arg")
+    continue
+  fi
+
   case $arg in
     install)
       INSTALL=1
+      ;;
+    test)
+      TEST=1
+      COLLECTING_TEST_ARGS=1
       ;;
     -y)
       YES_OPTION="-y"
@@ -33,8 +47,77 @@ for arg in "$@"; do
   esac
 done
 
+if [ $INSTALL -eq 1 ] && [ $TEST -eq 1 ]; then
+  echo -e "\x1b[1;31m[!] 'install' and 'test' cannot be used together.\x1b[0m"
+  exit 1
+fi
+
 if [ $INSTALL -eq 1 ]; then
   ./setup/install.sh $SHOW_HELP $YES_OPTION $FORCE_OPTION $OVERRIDE_OPTION $COMPILE_OPTION
+  exit $?
+fi
+
+# Top-level -h (without install/test) — pass through to empire.py
+if [ $TEST -eq 0 ] && [ -n "$SHOW_HELP" ]; then
+  EMPIRE_ARGS+=("$SHOW_HELP")
+fi
+
+# ./ps-empire test [pytest args...]
+# All arguments after "test" are passed directly to pytest so that
+# pytest flags are not consumed by ps-empire's own argument parser.
+#
+# Examples:
+#   ./ps-empire test                                  # run all tests
+#   ./ps-empire test -v                               # verbose output
+#   ./ps-empire test --runslow                        # include slow tests
+#   ./ps-empire test --cov=empire/server              # with coverage
+#   ./ps-empire test empire/test/test_agent_api.py    # single file
+#   ./ps-empire test empire/test/test_agent_api.py::test_get_agent  # single test
+#   ./ps-empire test -v --runslow --nodocker          # combine flags
+if [ $TEST -eq 1 ]; then
+  # Check if -h/--help was passed after "test" (in TEST_ARGS)
+  for targ in "${TEST_ARGS[@]}"; do
+    if [ "$targ" = "-h" ] || [ "$targ" = "--help" ]; then
+      SHOW_HELP="-h"
+      break
+    fi
+  done
+
+  if [ -n "$SHOW_HELP" ]; then
+    echo "Usage: ./ps-empire test [pytest-args...]"
+    echo ""
+    echo "Run the Empire test suite via pytest."
+    echo "All arguments after 'test' are passed directly to pytest."
+    echo ""
+    echo "Common options:"
+    echo "  -v                    Verbose output"
+    echo "  --runslow             Include slow tests"
+    echo "  --nodocker            Skip tests that fail in Docker"
+    echo "  --cov=empire/server   Run with coverage"
+    echo "  -k EXPRESSION         Only run tests matching expression"
+    echo "  path/to/test.py       Run a specific test file"
+    echo "  path::test_name       Run a specific test"
+    echo ""
+    echo "Examples:"
+    echo "  ./ps-empire test"
+    echo "  ./ps-empire test -v --runslow"
+    echo "  ./ps-empire test empire/test/test_agent_api.py -v"
+    echo "  ./ps-empire test --cov=empire/server --runslow"
+    exit 0
+  fi
+
+  if ! command -v poetry &> /dev/null; then
+    echo -e "\x1b[1;31m[!] poetry is not installed. Run './ps-empire install' or see https://python-poetry.org/docs/#installation\x1b[0m"
+    exit 1
+  fi
+
+  poetry run pytest "${TEST_ARGS[@]}"
+  rc=$?
+  if [ $rc -ne 0 ] && [ $rc -ne 1 ] && [ $rc -ne 2 ] && [ $rc -ne 5 ]; then
+    # Pytest codes 0=OK, 1=failures, 2=interrupted, 5=no tests. Codes 3/4 indicate internal or usage errors.
+    echo -e "\x1b[1;33m[*] pytest exited with unexpected code $rc. If the virtualenv is broken, try: poetry install\x1b[0m"
+  fi
+  exit $rc
 fi
 
 if [ "$EUID" -eq 0 ] && [ -z "$FORCE_OPTION" ]; then

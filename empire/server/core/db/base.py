@@ -1,6 +1,10 @@
 import logging
 import sqlite3
+import stat
+import subprocess
 import sys
+import tempfile
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -8,6 +12,7 @@ from sqlalchemy import Index, UniqueConstraint, create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import close_all_sessions, sessionmaker
+from sqlalchemy.pool import Pool, QueuePool
 
 from empire.server.core.db import models
 from empire.server.core.db.defaults import (
@@ -84,7 +89,21 @@ if use == "mysql":
     engine = try_create_engine(mysql_url, echo=False)
     with engine.connect() as connection:
         connection.execute(text(f"CREATE DATABASE IF NOT EXISTS {database_name}"))
-    engine = try_create_engine(f"{mysql_url}/{database_name}", echo=False)
+    engine = try_create_engine(
+        f"{mysql_url}/{database_name}",
+        echo=False,
+        pool_size=database_config.pool_size,
+        max_overflow=database_config.max_overflow,
+        pool_pre_ping=database_config.pool_pre_ping,
+        pool_recycle=database_config.pool_recycle,
+    )
+    log.info(
+        "MySQL pool: size=%d, max_overflow=%d, pre_ping=%s, recycle=%ds",
+        database_config.pool_size,
+        database_config.max_overflow,
+        database_config.pool_pre_ping,
+        database_config.pool_recycle,
+    )
 else:
     location = database_config.location
     engine = try_create_engine(
@@ -101,8 +120,188 @@ else:
         ),
     )
 
+
+# ---------------------------------------------------------------------------
+# Pool health logging
+# ---------------------------------------------------------------------------
+_POOL_WARN_THRESHOLD = 0.8  # warn when 80% of pool capacity is in use
+
+
+@event.listens_for(Pool, "checkout")
+def _on_pool_checkout(dbapi_conn, connection_rec, connection_proxy):
+    try:
+        pool = connection_proxy._pool  # noqa: SLF001
+        if not isinstance(pool, QueuePool):
+            return
+        pool_size = pool.size()
+        overflow = pool.overflow()
+        max_overflow = pool._max_overflow  # noqa: SLF001
+        checked_out = pool.checkedout()
+        total_capacity = pool_size + max_overflow
+        if total_capacity > 0 and checked_out / total_capacity >= _POOL_WARN_THRESHOLD:
+            log.warning(
+                "DB pool nearing capacity: %d/%d connections in use "
+                "(pool_size=%d, overflow=%d/%d)",
+                checked_out,
+                total_capacity,
+                pool_size,
+                overflow,
+                max_overflow,
+            )
+    except Exception:
+        log.warning("Pool health check failed — monitoring degraded", exc_info=True)
+
+
 SessionLocal = sessionmaker(bind=engine)
 Base.metadata.create_all(engine)
+
+
+def _alembic_cfg():
+    """Return an Alembic Config pointing at our migrations directory."""
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option(
+        "script_location",
+        str(Path(__file__).resolve().parent / "alembic"),
+    )
+    return cfg
+
+
+def _get_alembic_revision():
+    """Return the current Alembic revision, or None if untracked."""
+    from alembic.migration import MigrationContext
+
+    with engine.connect() as conn:
+        ctx = MigrationContext.configure(conn)
+        return ctx.get_current_revision()
+
+
+def _stamp_alembic_baseline():
+    """Stamp the database at the baseline revision (no migrations run).
+
+    Only called for databases that have never been tracked by Alembic.
+    """
+    from alembic import command
+
+    command.stamp(_alembic_cfg(), "0001")
+    log.info("Alembic: stamped database at baseline revision 0001.")
+
+
+def migrate_db():
+    """Run any pending Alembic migrations."""
+    from alembic import command
+
+    cfg = _alembic_cfg()
+    log.info("Alembic: checking for pending migrations...")
+    try:
+        command.upgrade(cfg, "head")
+        log.info("Alembic: migrations complete.")
+    except Exception:
+        log.error(
+            "Alembic migration failed. Consider restoring from a backup in "
+            "~/.local/share/empire/backups/ or running 'server --clean' to reset.",
+            exc_info=True,
+        )
+        raise
+
+
+def backup_db() -> Path | None:
+    """Back up the database before an update. Returns the backup path or None."""
+    from empire.server.core.config.config_manager import DATA_DIR
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = DATA_DIR / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
+    if use == "sqlite":
+        src = Path(database_config.location)
+        if src.exists():
+            dst = backup_dir / f"empire.db.{timestamp}"
+            # Use SQLite's backup API for a consistent snapshot even
+            # when the database is in WAL mode with active connections.
+            try:
+                src_conn = sqlite3.connect(str(src))
+                dst_conn = sqlite3.connect(str(dst))
+                try:
+                    src_conn.backup(dst_conn)
+                finally:
+                    dst_conn.close()
+                    src_conn.close()
+            except Exception:
+                log.error("SQLite backup failed.", exc_info=True)
+                dst.unlink(missing_ok=True)
+                return None
+            log.info(f"SQLite database backed up to {dst}")
+            return dst
+        log.warning("SQLite database file not found — nothing to back up.")
+        return None
+
+    if use == "mysql":
+        dst = backup_dir / f"empire_mysql.{timestamp}.sql"
+        parts = database_config.url.split(":")
+        host = parts[0]
+
+        # Write credentials to a temp file (mode 0600) instead of
+        # exposing them on the command line or via environment variables.
+        cnf_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".cnf", delete=False
+            ) as cnf:
+                escaped_pw = database_config.password.replace("\\", "\\\\").replace(
+                    '"', '\\"'
+                )
+                cnf.write(f'[client]\npassword="{escaped_pw}"\n')
+                cnf_path = cnf.name
+            Path(cnf_path).chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+            cmd = [
+                "mysqldump",
+                f"--defaults-extra-file={cnf_path}",
+                "-u",
+                database_config.username,
+                "-h",
+                host,
+            ]
+            if len(parts) > 1:
+                cmd.extend(["-P", parts[1]])
+            cmd.append(database_config.database_name)
+
+            with dst.open("w") as outfile:
+                try:
+                    result = subprocess.run(
+                        cmd,
+                        stdout=outfile,
+                        stderr=subprocess.PIPE,
+                        check=False,
+                    )
+                except FileNotFoundError:
+                    log.error(
+                        "mysqldump not found on PATH. Install mysql-client "
+                        "to enable MySQL backups."
+                    )
+                    dst.unlink(missing_ok=True)
+                    return None
+            if result.returncode == 0:
+                log.info(f"MySQL database backed up to {dst}")
+                return dst
+            log.warning(
+                f"MySQL backup failed (exit {result.returncode}): "
+                f"{result.stderr.decode(errors='replace')}"
+            )
+            dst.unlink(missing_ok=True)
+        except Exception:
+            log.error("MySQL backup failed unexpectedly.", exc_info=True)
+            dst.unlink(missing_ok=True)
+        finally:
+            if cnf_path is not None:
+                Path(cnf_path).unlink(missing_ok=True)
+
+        return None
+
+    log.warning(f"Unknown database type '{use}' — cannot back up.")
+    return None
 
 
 def startup_db():
@@ -180,5 +379,28 @@ def startup_db():
         log.error("Failed to setup database.")
         log.error(
             "If you have recently updated Empire, please run 'server --clean' to reset the database."
+        )
+        sys.exit(1)
+
+    # Stamp Alembic baseline for databases not yet tracked by Alembic.
+    # Existing tracked databases are left as-is so migrate_db() can
+    # apply any pending migrations. Kept outside the DB-setup try/except
+    # so that Alembic failures get their own error message instead of the
+    # misleading "run --clean" advice.
+    try:
+        current_rev = _get_alembic_revision()
+        if current_rev is None:
+            _stamp_alembic_baseline()
+        else:
+            log.info(
+                "Alembic: database already tracked at revision %s.",
+                current_rev,
+            )
+    except Exception:
+        log.error(
+            "Alembic: failed to initialize migration tracking. "
+            "Check that the alembic package is installed and the "
+            "migrations directory exists at empire/server/core/db/alembic/.",
+            exc_info=True,
         )
         sys.exit(1)

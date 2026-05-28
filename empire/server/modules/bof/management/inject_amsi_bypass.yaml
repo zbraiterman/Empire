@@ -1,0 +1,34 @@
+name: inject_amsi_bypass
+authors:
+  - name: boku
+    handle: '@0xBoku'
+    link: https://github.com/boku7
+description: |
+  Beacon Object File (BOF) that bypasses AMSI in a remote process by patching
+  AmsiOpenSession in the target process memory. Uses syscalls (HellsGate/HalosGate)
+  to write the bypass (xor rax,rax; ret) into the remote process. x64 only.
+software: ''
+tactics: [TA0005]
+techniques: [T1562.001]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: bof
+min_language_version: ''
+comments:
+  - https://github.com/sliverarmory/injectAmsiBypass
+options:
+  - name: Pid
+    description: Process ID of the remote process to inject the AMSI bypass into.
+    required: true
+    value: ''
+bof:
+  x86: ''
+  x64: bof/injectAmsiBypass/inject-amsiBypass.x64.o
+  entry_point: ''
+  format_string: i
+script_path: ''
+script_end: ''
+advanced:
+  custom_generate: true

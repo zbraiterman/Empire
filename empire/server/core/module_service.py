@@ -111,6 +111,7 @@ class ModuleService:
         ignore_language_version_check: bool = False,
         ignore_admin_check: bool = False,
         modified_input: str | None = None,
+        background_override: bool | None = None,
     ) -> tuple[ModuleExecutionRequest | None, str | None]:
         """
         Execute the module. Note this doesn't actually add the task to the queue,
@@ -178,7 +179,11 @@ class ModuleService:
 
         extension = module.output_extension.rjust(5) if module.output_extension else ""
 
-        effective_background = cleaned_options.pop("Background", module.background)
+        effective_background = (
+            background_override
+            if background_override is not None
+            else module.background
+        )
 
         if agent.language in ("ironpython", "python"):
             if module.language == "python":
@@ -447,7 +452,7 @@ class ModuleService:
         }
 
         formatted_args = " ".join(
-            f'"{value}"' if " " in value else value
+            f'"{value}"' if " " in str(value) else str(value)
             for value in filtered_params.values()
         )
 
@@ -475,7 +480,7 @@ class ModuleService:
         agent_language: str,
         obfuscate: bool = False,
         entry_point: str = "go",
-    ) -> str:
+    ) -> str | ModuleExecutionRequest:
         """
         Build the final output string for a BOF module.
 
@@ -510,7 +515,11 @@ class ModuleService:
             json.dumps(params_dict).encode("utf-8")
         ).decode("utf-8")
 
-        return f"{script_file}|,{final_base64_json}"
+        return ModuleExecutionRequest(
+            command="",
+            data=f"{script_file}|,{final_base64_json}",
+            files=[script_file],
+        )
 
     def generate_go_bof(
         self,
@@ -541,7 +550,7 @@ class ModuleService:
         }
 
         formatted_args = " ".join(
-            f'"{value}"' if " " in value else value
+            f'"{value}"' if " " in str(value) else str(value)
             for value in filtered_params.values()
         )
 
@@ -601,7 +610,7 @@ class ModuleService:
 
         # Create a list of arguments
         formatted_args = [
-            f'"{value}"' if " " in value else value
+            f'"{value}"' if " " in str(value) else str(value)
             for value in filtered_params.values()
         ]
 
@@ -705,12 +714,15 @@ class ModuleService:
             .replace("{{OUTPUT_FUNCTION}}", params.get("OutputFunction", "Out-String"))
         )
 
-        # obfuscate the invoke command and append to script
+        # When obfuscation is enabled, the script source is already
+        # obfuscated (from get_module_source or inline obfuscation above),
+        # so tell finalize_module to only obfuscate the invoke command.
         return self.finalize_module(
             script=script,
             script_end=script_end,
             obfuscate=obfuscate,
             obfuscation_command=obfuscate_command,
+            script_already_obfuscated=obfuscate,
         )
 
     def generate_script_csharp(
@@ -992,6 +1004,40 @@ class ModuleService:
                 self.obfuscate_module(file, db_obf_config.command, reobfuscate)
             return None
 
+    def preobfuscate_module_by_id(
+        self, module_id: str, reobfuscate=False
+    ) -> str | None:
+        """Pre-obfuscate a single module's source file.
+
+        Follows the same pattern as ``preobfuscate_modules`` but for a
+        single module looked up by ID.  Returns None on success or an
+        error message string.
+        """
+        module = self.get_by_id(module_id)
+        if not module:
+            log.error("Pre-obfuscation: module not found: %s", module_id)
+            return f"Module not found: {module_id}"
+        if not module.script_path:
+            log.warning("Pre-obfuscation: %s has no script_path", module_id)
+            return f"Module {module_id} has no script_path"
+
+        source_path = self.module_source_path / module.script_path
+        with SessionLocal.begin() as db:
+            config = self.obfuscation_service.get_obfuscation_config(
+                db, module.language
+            )
+            if not config:
+                log.error(
+                    "Pre-obfuscation: no obfuscation config for language %s",
+                    module.language,
+                )
+                return f"No obfuscation config for language: {module.language}"
+            obfuscation_command = config.command
+
+        log.info("Pre-obfuscating module %s (%s)", module_id, module.script_path)
+        self.obfuscate_module(source_path, obfuscation_command, reobfuscate)
+        return None
+
     # this is still written in a way that its only used for PowerShell
     # to make it work for other languages, we probably want to just pass in the db_obf_config
     # and delegate to language specific functions
@@ -1051,17 +1097,36 @@ class ModuleService:
         script_end: str,
         obfuscate: bool = False,
         obfuscation_command: str = "",
+        script_already_obfuscated: bool = False,
     ) -> str:
-        """
-        Combine script and script end with obfuscation if needed.
+        """Combine script and script_end with obfuscation if needed.
+
+        When ``script_already_obfuscated`` is True, the script body has
+        already been through Invoke-Obfuscation (via ``get_module_source``
+        or ``auto_get_source``), so only ``script_end`` is obfuscated.
+        When False (the default), the full combined script is obfuscated
+        as a single unit — this is the safe default for any caller that
+        constructs a script without pre-obfuscating it (e.g.,
+        custom_generate modules that call ``finalize_module`` directly).
+
+        Keyword obfuscation (lightweight string replacement) is always
+        applied to the full combined result regardless.
         """
         if "PowerSploit File: PowerView.ps1" in script:
             module_name = script_end.lstrip().split(" ")[0]
             script = helpers.generate_dynamic_powershell_script(script, module_name)
 
-        script += script_end
         if obfuscate:
-            script = self.obfuscation_service.obfuscate(script, obfuscation_command)
+            if script_already_obfuscated:
+                script_end = self.obfuscation_service.obfuscate(
+                    script_end, obfuscation_command
+                )
+            else:
+                script += script_end
+                script = self.obfuscation_service.obfuscate(script, obfuscation_command)
+                return self.obfuscation_service.obfuscate_keywords(script)
+
+        script += script_end
         return self.obfuscation_service.obfuscate_keywords(script)
 
     def delete_all_modules(self, db: Session):
@@ -1109,6 +1174,7 @@ def auto_finalize(func):
             script_end=script_end,
             obfuscate=obfuscate,
             obfuscation_command=obfuscation_command,
+            script_already_obfuscated=obfuscate,
         )
 
     return wrapper

@@ -1,4 +1,9 @@
 suppress_self_cert_warning: true
+obfuscation:
+  # Maximum seconds for a single obfuscation subprocess.
+  # Increase for large modules (e.g. PowerView, Mimikatz) on slow hardware.
+  # Set to 0 to disable the timeout entirely.
+  timeout: 300
 api:
   ip: 0.0.0.0
   port: 1337
@@ -12,6 +17,10 @@ database:
     username: empire_user
     password: empire_password
     database_name: empire
+    pool_size: 10
+    max_overflow: 15
+    pool_pre_ping: true
+    pool_recycle: 3600
   sqlite:
     location: empire.db
   defaults:
@@ -42,14 +51,15 @@ database:
     ip_allow_list: []
     ip_deny_list: []
 empire_compiler:
-  archive: https://github.com/BC-SECURITY/Empire-Compiler/releases/download/v0.4.4/EmpireCompiler-{{platform}}-v0.4.4.tgz
+  repo: BC-SECURITY/Empire-Compiler
+  ref: v1.0.0
   # Path to the confuser xml project file you want to use
   confuser_proj: empire/server/data/confuser.crproj
 starkiller:
   enabled: true
   repo: https://github.com/BC-SECURITY/Starkiller.git
   # Can be a branch, tag, or commit hash
-  ref: v3.4.0
+  ref: v3.5.0
 submodules:
   auto_update: true
 plugin_marketplace:

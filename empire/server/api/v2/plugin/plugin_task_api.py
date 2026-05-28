@@ -59,7 +59,7 @@ router = APIRouter(
 )
 
 
-async def get_plugin(
+def get_plugin(
     plugin_id: str,
     db: CurrentSession,
     plugin_service: PluginServiceDep,
@@ -75,7 +75,7 @@ async def get_plugin(
 PluginDep = Annotated[PluginHolder, Depends(get_plugin)]
 
 
-async def get_task(
+def get_task(
     uid: int,
     db: CurrentSession,
     plugin: PluginDep,
@@ -98,7 +98,7 @@ tag_api.add_endpoints_to_taggable(router, "/{plugin_id}/tasks/{uid}/tags", get_t
 
 
 @router.get("/tasks", response_model=PluginTasks)
-async def read_tasks_all_plugins(
+def read_tasks_all_plugins(
     db: CurrentSession,
     limit: int = -1,
     page: int = 1,
@@ -145,7 +145,7 @@ async def read_tasks_all_plugins(
 
 
 @router.get("/{plugin_id}/tasks", response_model=PluginTasks)
-async def read_tasks(
+def read_tasks(
     db: CurrentSession,
     plugin: PluginDep,
     plugin_task_service: PluginTaskServiceDep,
@@ -191,7 +191,7 @@ async def read_tasks(
 
 
 @router.get("/{plugin_id}/tasks/{uid}", response_model=PluginTask)
-async def read_task(
+def read_task(
     uid: int,
     db_task: TaskDep,
 ):

@@ -35,7 +35,7 @@ router = APIRouter(
 
 
 @router.get("/", response_model=StagerTemplates)
-async def get_stager_templates(
+def get_stager_templates(
     stager_template_service: StagerTemplateServiceDep,
 ):
     templates = [
@@ -50,7 +50,7 @@ async def get_stager_templates(
     "/{uid}",
     response_model=StagerTemplate,
 )
-async def get_stager_template(
+def get_stager_template(
     uid: str,
     stager_template_service: StagerTemplateServiceDep,
 ):

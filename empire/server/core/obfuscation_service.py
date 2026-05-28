@@ -7,6 +7,7 @@ import python_obfuscator
 from python_obfuscator.techniques import one_liner, variable_renamer
 from sqlalchemy.orm import Session
 
+from empire.server.core.config.config_manager import empire_config
 from empire.server.core.db import models
 from empire.server.core.db.base import SessionLocal
 from empire.server.utils import data_util
@@ -86,15 +87,24 @@ class ObfuscationService:
 
         return db_obf_config, None
 
-    def obfuscate(self, ps_script, obfuscation_command):
+    def obfuscate(self, ps_script, obfuscation_command, timeout=None):
         """
-        Obfuscate PowerShell scripts using Invoke-Obfuscation
+        Obfuscate PowerShell scripts using Invoke-Obfuscation.
+
+        :param timeout: Maximum seconds for the obfuscation subprocess.
+            Defaults to empire_config.obfuscation.timeout (300s out of the box).
+            Set to 0 to disable the timeout entirely.
+            On timeout, returns the script with only keyword obfuscation applied.
         """
+        if timeout is None:
+            timeout = empire_config.obfuscation.timeout
+        if timeout == 0:
+            timeout = None
         if not data_util.is_powershell_installed():
             log.error(
                 "PowerShell is not installed and is required to use obfuscation, please install it first."
             )
-            return ""
+            return ps_script
 
         # run keyword obfuscation before obfuscation
         ps_script = self.obfuscate_keywords(ps_script)
@@ -109,14 +119,44 @@ class ObfuscationService:
             # Obfuscate using Invoke-Obfuscation w/ PowerShell
             install_path = self.main_menu.install_path
             toObfuscateFile.seek(0)
-            subprocess.call(
-                f'{data_util.get_powershell_name()} -C \'$ErrorActionPreference = "SilentlyContinue";Import-Module {install_path}/data/Invoke-Obfuscation/Invoke-Obfuscation.psd1;Invoke-Obfuscation -ScriptPath {toObfuscateFile.name} -Command "{self._convert_obfuscation_command(obfuscation_command)}" -Quiet | Out-File -Encoding ASCII {obfuscatedFile.name}\'',
-                shell=True,
-            )
+            try:
+                result = subprocess.run(
+                    f'{data_util.get_powershell_name()} -C \'$ErrorActionPreference = "SilentlyContinue";Import-Module {install_path}/data/Invoke-Obfuscation/Invoke-Obfuscation.psd1;Invoke-Obfuscation -ScriptPath {toObfuscateFile.name} -Command "{self._convert_obfuscation_command(obfuscation_command)}" -Quiet | Out-File -Encoding ASCII {obfuscatedFile.name}\'',
+                    shell=True,
+                    timeout=timeout,
+                    check=False,
+                    start_new_session=True,
+                    capture_output=True,
+                )
+            except subprocess.TimeoutExpired:
+                log.error(
+                    "Obfuscation subprocess timed out after %ds. "
+                    "Consider pre-obfuscating modules or increasing the timeout.",
+                    timeout,
+                )
+                return ps_script
+
+            if result.returncode != 0:
+                log.error(
+                    "Obfuscation subprocess failed (exit code %d): %s",
+                    result.returncode,
+                    result.stderr.decode(errors="replace")[:500]
+                    if result.stderr
+                    else "",
+                )
+                return ps_script
 
             # Obfuscation writes a newline character to the end of the file, ignoring that character
             obfuscatedFile.seek(0)
-            return obfuscatedFile.read()[0:-1]
+            obfuscated = obfuscatedFile.read()[0:-1]
+            if not obfuscated.strip():
+                log.error(
+                    "Obfuscation produced empty output for command: %s",
+                    obfuscation_command,
+                )
+                return ps_script
+
+            return obfuscated
 
     def obfuscate_keywords(self, data):
         if data:

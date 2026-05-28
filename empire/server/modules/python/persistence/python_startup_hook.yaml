@@ -1,0 +1,79 @@
+name: python_startup_hook
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Establish persistence by dropping an Empire Python launcher into a
+  Python interpreter startup hook. Two methods are supported:
+
+    pth: drops empire_hook.pth into the first writable site-packages
+         directory (system-wide if the process has write access, else
+         the per-user site-packages). Python's site module executes any
+         line in a .pth file that starts with `import`, so the launcher
+         runs on every interpreter startup.
+
+    usercustomize: appends the launcher to the user's usercustomize.py
+         (per-user scope). Python loads usercustomize on every
+         invocation for the current user.
+
+  Both methods trigger whenever Python is started, which is common on
+  systems with Python-based tools and services. Does not require
+  elevated privileges for the per-user paths.
+software: ''
+tactics: [TA0003, TA0004]
+techniques: [T1546.018]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: python
+min_language_version: '3'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Listener
+    description: Listener to stage via the Python startup hook.
+    required: true
+    value: ''
+    depends_on:
+      - name: Cleanup
+        values:
+          - 'False'
+  - name: Method
+    description: >-
+      Persistence method to use. pth drops a .pth file in site-packages. usercustomize
+      appends to usercustomize.py.
+    required: true
+    value: 'pth'
+    strict: true
+    suggested_values:
+      - pth
+      - usercustomize
+  - name: SafeChecks
+    description: >-
+      Checks for sandbox indicators in the stager and exits if detected.
+    required: false
+    value: 'True'
+    strict: true
+    suggested_values:
+      - True
+      - False
+  - name: UserAgent
+    description: User-agent string to use for the staging request (default, none,
+      or other).
+    required: false
+    value: default
+  - name: Cleanup
+    description: >-
+      Remove the installed hook instead of installing it. Removes empire_hook.pth
+      from site-packages (pth method) or strips the empire-hook block from usercustomize.py
+      (usercustomize method).
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - True
+      - False
+advanced:
+  custom_generate: true

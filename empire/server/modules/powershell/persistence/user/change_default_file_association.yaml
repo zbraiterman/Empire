@@ -1,0 +1,106 @@
+name: Set-DefaultFileAssociation
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Modifies the HKCU default file association for a specified extension
+  to execute an Empire launcher. When a user opens a file with the
+  targeted extension, the system will launch the Empire payload instead
+  of the legitimate handler. Uses direct registry modification under
+  HKCU:\Software\Classes\ for persistence that triggers whenever the
+  user double-clicks a file of the targeted type. Original HKCU values
+  are backed up to HKCU:\Software\Empire\FileAssocBackup for Cleanup.
+  Note: HKLM (machine-wide) associations are not touched; if the
+  extension's original handler lived in HKLM, Cleanup restores the
+  HKCU state, not the HKLM entry.
+software: ''
+tactics: [TA0003]
+techniques: [T1546.001]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Listener
+    description: Listener to use for the stager.
+    required: true
+    value: ''
+  - name: Language
+    description: Language of the stager to generate.
+    required: true
+    value: powershell
+    strict: true
+    suggested_values:
+      - powershell
+      - csharp
+      - ironpython
+      - go
+  - name: Extension
+    description: File extension to hijack (e.g., .txt, .hta, .log).
+    required: true
+    value: '.hta'
+    suggested_values:
+      - '.hta'
+      - '.txt'
+      - '.log'
+      - '.csv'
+  - name: ScriptPath
+    description: >-
+      Path where the launcher script is written. The file holds a single PowerShell
+      stager command (not batch syntax) that cmd.exe /c invokes when the hijacked
+      extension is opened. Extension is cosmetic.
+    required: true
+    value: '$env:APPDATA\file_handler.bat'
+  - name: Obfuscate
+    description: Obfuscate the launcher powershell code.
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - True
+      - False
+    depends_on:
+      - name: Language
+        values: ['powershell']
+  - name: ObfuscateCommand
+    description: The Invoke-Obfuscation command to use.
+    required: false
+    value: Token\All\1
+    depends_on:
+      - name: Language
+        values: ['powershell']
+      - name: Obfuscate
+        values: ['True']
+  - name: Bypasses
+    description: Bypasses as a space separated list to be prepended to the launcher.
+    required: false
+    value: ''
+  - name: UserAgent
+    description: User-agent string to use for the staging request (default, none,
+      or other).
+    required: false
+    value: default
+  - name: Proxy
+    description: Proxy to use for request (default, none, or other).
+    required: false
+    value: default
+  - name: ProxyCreds
+    description: Proxy credentials ([domain\]username:password) to use for request
+      (default, none, or other).
+    required: false
+    value: default
+  - name: Cleanup
+    description: Remove the persistence mechanism and restore original file association.
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - True
+      - False
+advanced:
+  custom_generate: true

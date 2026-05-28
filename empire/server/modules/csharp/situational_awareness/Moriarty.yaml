@@ -8,7 +8,7 @@ description: |
 software: ''
 tactics: [TA0007]
 techniques: [T1012, T1518, T1082]
-background: true
+background: false
 output_extension: ''
 needs_admin: false
 opsec_safe: true
@@ -21,16 +21,6 @@ options:
     value: --debug
     strict: false
     suggested_values: []
-  - name: Background
-    description: Run as a background job (non-blocking). Can be killed via the jobs/kill_job
-      endpoint.
-    required: false
-    value: 'false'
-    type: bool
-    suggested_values:
-      - 'true'
-      - 'false'
-    strict: true
 csharp:
   UnsafeCompile: true
   CompatibleDotNetVersions:
@@ -90,46 +80,7 @@ csharp:
       Language: CSharp
       CompatibleDotNetVersions:
         - net45
-      ReferenceAssemblies:
-        - Name: System.dll
-          Location: net45\System.dll
-          DotNetVersion: net45
-        - Name: System.Core.dll
-          Location: net45\System.Core.dll
-          DotNetVersion: net45
-        - Name: mscorlib.dll
-          Location: net45\mscorlib.dll
-          DotNetVersion: net45
-        - Name: System.XML.dll
-          Location: net45\System.XML.dll
-          DotNetVersion: net45
-        - Name: System.Xml.Linq.dll
-          Location: net45\System.Xml.Linq.dll
-          DotNetVersion: net45
-        - Name: System.Data.dll
-          Location: net45\System.Data.dll
-          DotNetVersion: net45
-        - Name: System.Management.dll
-          Location: net45\System.Management.dll
-          DotNetVersion: net45
-        - Name: System.Data.DataSetExtensions.dll
-          Location: net45\System.Data.DataSetExtensions.dll
-          DotNetVersion: net45
-        - Name: System.Web.Extensions.dll
-          Location: net45\System.Web.Extensions.dll
-          DotNetVersion: net45
-        - Name: System.ServiceProcess.dll
-          Location: net45\System.ServiceProcess.dll
-          DotNetVersion: net45
-        - Name: System.Net.Http.dll
-          Location: net45\System.Net.Http.dll
-          DotNetVersion: net45
-        - Name: System.IO.Compression.dll
-          Location: net45\System.IO.Compression.dll
-          DotNetVersion: net45
-        - Name: System.IO.Compression.FileSystem.dll
-          Location: net45\System.IO.Compression.FileSystem.dll
-          DotNetVersion: net45
+      ReferenceAssemblies: []
       EmbeddedResources: []
   ReferenceAssemblies: []
   EmbeddedResources: []

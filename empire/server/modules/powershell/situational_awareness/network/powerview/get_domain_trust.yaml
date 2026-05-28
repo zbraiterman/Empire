@@ -43,26 +43,38 @@ options:
     required: true
     value: ''
   - name: API
-    description: Switch. Use Win32 API
+    description: Use Win32 API
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Domain
     description: The domain whose trusts to enumerate, defaults to the current domain.
     required: false
     value: ''
   - name: FindOne
-    description: Switch. Return one object.
+    description: Return one object.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: LDAPFilter
     description: Specifies an LDAP query string that is used to filter Active Directory
       objects.
     required: false
     value: ''
   - name: NET
-    description: Switch. Use .NET methods
+    description: Use .NET methods
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Properties
     description: Specifies the properties of the output object to retrieve from the
       server.

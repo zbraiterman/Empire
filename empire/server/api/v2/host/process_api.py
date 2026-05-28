@@ -41,7 +41,7 @@ router = APIRouter(
 )
 
 
-async def get_host(
+def get_host(
     host_id: int,
     db: CurrentSession,
     host_service: HostServiceDep,
@@ -57,7 +57,7 @@ async def get_host(
 HostDep = Annotated[models.Host, Depends(get_host)]
 
 
-async def get_process(
+def get_process(
     uid: int,
     db: CurrentSession,
     db_host: HostDep,
@@ -77,12 +77,12 @@ ProcessDep = Annotated[models.HostProcess, Depends(get_process)]
 
 
 @router.get("/{uid}", response_model=Process)
-async def read_process(uid: int, db_process: ProcessDep):
+def read_process(uid: int, db_process: ProcessDep):
     return domain_to_dto_process(db_process)
 
 
 @router.get("/", response_model=Processes)
-async def read_processes(
+def read_processes(
     db: CurrentSession,
     db_host: HostDep,
     host_process_service: HostProcessServiceDep,

@@ -123,16 +123,15 @@ def test_update_user_not_found(client, admin_auth_header):
     assert response.json()["detail"] == "User not found for id 9999"
 
 
-def test_update_user_as_admin(client, admin_auth_header):
-    user_id = 2
+def test_update_user_as_admin(client, admin_auth_header, test_user_id):
     response = client.put(
-        f"/api/v2/users/{user_id}",
+        f"/api/v2/users/{test_user_id}",
         headers=admin_auth_header,
         json={"username": "empireadmin-2.0", "enabled": True, "is_admin": False},
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json()["id"] == user_id
+    assert response.json()["id"] == test_user_id
     assert response.json()["username"] == "empireadmin-2.0"
 
 

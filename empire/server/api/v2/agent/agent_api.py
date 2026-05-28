@@ -47,7 +47,7 @@ router = APIRouter(
 )
 
 
-async def get_agent(
+def get_agent(
     uid: str,
     db: CurrentSession,
     agent_service: AgentServiceDep,
@@ -120,12 +120,12 @@ def read_agent_checkins_aggregate(
 
 
 @router.get("/{uid}", response_model=Agent)
-async def read_agent(uid: str, db_agent: AgentDep):
+def read_agent(uid: str, db_agent: AgentDep):
     return domain_to_dto_agent(db_agent)
 
 
 @router.get("/", response_model=Agents)
-async def read_agents(
+def read_agents(
     db: CurrentSession,
     agent_service: AgentServiceDep,
     include_archived: bool = False,
@@ -140,7 +140,7 @@ async def read_agents(
 
 
 @router.put("/{uid}", response_model=Agent)
-async def update_agent(
+def update_agent(
     uid: str,
     agent_req: AgentUpdateRequest,
     db: CurrentSession,

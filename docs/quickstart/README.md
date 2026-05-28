@@ -14,6 +14,23 @@ Empire uses a server/client architecture, which is handled automatically by the 
 ./ps-empire server -h
 ```
 
+### Testing
+
+Run the test suite via pytest. All arguments after `test` are passed directly to pytest.
+
+```bash
+# Run all tests
+./ps-empire test
+
+# Verbose with slow tests
+./ps-empire test -v --runslow
+
+# Single test file
+./ps-empire test empire/test/test_agent_api.py -v
+```
+
+### Reset
+
 The server can be reset by passing a `--reset` flag. This will delete the database and any files that were created at runtime. It is recommended to run a `--reset` after any upgrades.
 
 ```

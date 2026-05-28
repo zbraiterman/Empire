@@ -76,15 +76,15 @@ jobs:
         run: |
           set -o pipefail
           if [ "${{ matrix.python-version }}" = "3.14" ]; then
-            DATABASE_USE=mysql poetry run pytest -v --runslow --cov=empire/server --junitxml=pytest.xml --cov-report=term-missing:skip-covered . | tee pytest-coverage.txt
+            DATABASE_USE=mysql poetry run pytest -v --runslow --durations=10 --cov=empire/server --junitxml=pytest.xml --cov-report=term-missing:skip-covered . | tee pytest-coverage.txt
           else
-            DATABASE_USE=mysql poetry run pytest -v --runslow .
+            DATABASE_USE=mysql poetry run pytest -v --runslow --durations=10 .
           fi
       - name: Run test suite - sqlite
         if: ${{ startsWith(github.head_ref, 'release/') || contains(github.event.pull_request.labels.*.name,
           'test-sqlite') }}
         run: |
-          DATABASE_USE=sqlite poetry run pytest . -v --runslow
+          DATABASE_USE=sqlite poetry run pytest . -v --runslow --durations=10 -m "not mysql"
       - name: Pytest coverage comment
         if: ${{ matrix.python-version == '3.14' }}
         uses: MishaKav/pytest-coverage-comment@v1.2.0

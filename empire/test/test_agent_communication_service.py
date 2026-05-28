@@ -554,3 +554,34 @@ def _test_autorun_task(
     assert tasks[0].task_name == "TASK_POWERSHELL_CMD_JOB"
     assert tasks[0].module_name == mock_autorun_task[1]["module_id"]
     assert tasks[0].status == "queued"
+
+
+class _PoppingDict(dict):
+    """Race-condition simulator: `in` check pops the key as a side effect.
+
+    Models the TOCTOU window where another thread calls
+    self.agents.pop(session_id) between `session_id in self.agents`
+    and `self.agents[session_id]`.
+    """
+
+    def __contains__(self, key):
+        hit = super().__contains__(key)
+        if hit:
+            self.pop(key, None)
+        return hit
+
+
+def test_handle_agent_response_survives_cache_pop_between_check_and_subscript(
+    agent_communication_service, agent
+):
+    session_id = agent  # fixture returns session_id string directly
+    original_agents = agent_communication_service.agents
+    agent_communication_service.agents = _PoppingDict(original_agents)
+    try:
+        result = agent_communication_service._handle_agent_response(
+            session_id, enc_data=b""
+        )
+    finally:
+        agent_communication_service.agents = original_agents
+
+    assert result is None

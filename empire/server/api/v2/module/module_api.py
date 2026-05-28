@@ -38,7 +38,7 @@ router = APIRouter(
 )
 
 
-async def get_module(uid: str, module_service: ModuleServiceDep):
+def get_module(uid: str, module_service: ModuleServiceDep):
     module = module_service.get_by_id(uid)
 
     if module:
@@ -56,7 +56,7 @@ ModuleDep = Annotated[EmpireModule, Depends(get_module)]
     #  Still want to display the response type in the docs
     # response_model=Modules,
 )
-async def read_modules(
+def read_modules(
     module_service: ModuleServiceDep,
     hide_disabled: bool = False,
 ):
@@ -69,7 +69,7 @@ async def read_modules(
 
 
 @router.get("/{uid}", response_model=Module)
-async def read_module(
+def read_module(
     uid: str,
     module: ModuleDep,
 ):
@@ -77,7 +77,7 @@ async def read_module(
 
 
 @router.get("/{uid}/script", response_model=ModuleScript)
-async def read_module_script(
+def read_module_script(
     uid: str,
     module: ModuleDep,
     module_service: ModuleServiceDep,
@@ -91,7 +91,7 @@ async def read_module_script(
 
 
 @router.put("/{uid}", response_model=Module)
-async def update_module(
+def update_module(
     uid: str,
     module_req: ModuleUpdateRequest,
     db: CurrentSession,
@@ -104,7 +104,7 @@ async def update_module(
 
 
 @router.put("/bulk/enable", status_code=204, response_class=Response)
-async def update_bulk_enable(
+def update_bulk_enable(
     module_req: ModuleBulkUpdateRequest,
     db: CurrentSession,
     module_service: ModuleServiceDep,
@@ -113,11 +113,11 @@ async def update_bulk_enable(
 
 
 @router.post("/reload", status_code=204, response_class=Response)
-async def reload_modules(db: CurrentSession, module_service: ModuleServiceDep):
+def reload_modules(db: CurrentSession, module_service: ModuleServiceDep):
     module_service.load_modules(db)
 
 
 @router.post("/reset", status_code=204, response_class=Response)
-async def reset_modules(db: CurrentSession, module_service: ModuleServiceDep):
+def reset_modules(db: CurrentSession, module_service: ModuleServiceDep):
     module_service.delete_all_modules(db)
     module_service.load_modules(db)

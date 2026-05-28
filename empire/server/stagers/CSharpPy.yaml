@@ -98,67 +98,31 @@
       Language: CSharp
       CompatibleDotNetVersions:
         - Net40
-      ReferenceAssemblies:
-        - Name: System.dll
-          Location: net40\System.dll
-          DotNetVersion: Net40
-        - Name: mscorlib.dll
-          Location: net40\mscorlib.dll
-          DotNetVersion: Net40
-        - Name: System.Core.dll
-          Location: net40\System.Core.dll
-          DotNetVersion: Net40
-        - Name: IronPython.dll
-          Location: net40\IronPython.dll
-          DotNetVersion: Net40
-        - Name: IronPython.SQLite.dll
-          Location: net40\IronPython.SQLite.dll
-          DotNetVersion: Net40
-        - Name: IronPython.Wpf.dll
-          Location: net40\IronPython.Wpf.dll
-          DotNetVersion: Net40
-        - Name: IronPython.Modules.dll
-          Location: net40\IronPython.Modules.dll
-          DotNetVersion: Net40
-        - Name: Microsoft.Dynamic.dll
-          Location: net40\Microsoft.Dynamic.dll
-          DotNetVersion: Net40
-        - Name: Microsoft.Scripting.dll
-          Location: net40\Microsoft.Scripting.dll
-          DotNetVersion: Net40
-        - Name: Microsoft.Scripting.Metadata.dll
-          Location: net40\Microsoft.Scripting.Metadata.dll
-          DotNetVersion: Net40
-        - Name: System.Runtime.CompilerServices.Unsafe.dll
-          Location: net40\System.Runtime.CompilerServices.Unsafe.dll
-          DotNetVersion: Net40
-        - Name: Microsoft.CSharp.Reference.dll
-          Location: net40\Microsoft.CSharp.dll
-          DotNetVersion: Net40
+      ReferenceAssemblies: []
       EmbeddedResources:
         - Name: System.Runtime.CompilerServices.Unsafe.dll
-          Location: System.Runtime.CompilerServices.Unsafe.dll
+          Location: net40\System.Runtime.CompilerServices.Unsafe.dll
         - Name: System.Memory.dll
-          Location: System.Memory.dll
+          Location: net40\System.Memory.dll
         - Name: System.Buffers.dll
-          Location: System.Buffers.dll
+          Location: net40\System.Buffers.dll
         - Name: IronPython.dll
-          Location: IronPython.dll
+          Location: net40\IronPython.dll
         - Name: IronPython.Modules.dll
-          Location: IronPython.Modules.dll
+          Location: net40\IronPython.Modules.dll
         - Name: IronPython.SQLite.dll
-          Location: IronPython.SQLite.dll
+          Location: net40\IronPython.SQLite.dll
         - Name: IronPython.Wpf.dll
-          Location: IronPython.Wpf.dll
+          Location: net40\IronPython.Wpf.dll
         - Name: Microsoft.Scripting.dll
-          Location: Microsoft.Scripting.dll
+          Location: net40\Microsoft.Scripting.dll
         - Name: Microsoft.Scripting.Metadata.dll
-          Location: Microsoft.Scripting.Metadata.dll
+          Location: net40\Microsoft.Scripting.Metadata.dll
         - Name: Microsoft.Dynamic.dll
-          Location: Microsoft.Dynamic.dll
+          Location: net40\Microsoft.Dynamic.dll
         - Name: Lib.zip
-          Location: Lib.zip
+          Location: common\Lib.zip
         - Name: launcher.txt
-          Location: launcher.txt
+          Location: common\launcher.txt
   ReferenceAssemblies: []
   EmbeddedResources: []

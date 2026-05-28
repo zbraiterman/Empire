@@ -48,13 +48,13 @@ class Module:
             raise ModuleValidationException(f"[!] Invalid listener: {listener_name}")
 
         multi_launcher = main_menu.stagertemplatesv2.new_instance("multi_launcher")
-        multi_launcher.options["Listener"] = params["Listener"]
-        multi_launcher.options["UserAgent"] = params["UserAgent"]
-        multi_launcher.options["Proxy"] = params["Proxy"]
-        multi_launcher.options["ProxyCreds"] = params["ProxyCreds"]
-        multi_launcher.options["Obfuscate"] = params["Obfuscate"]
-        multi_launcher.options["ObfuscateCommand"] = params["ObfuscateCommand"]
-        multi_launcher.options["Bypasses"] = params["Bypasses"]
+        multi_launcher.options["Listener"]["Value"] = params["Listener"]
+        multi_launcher.options["UserAgent"]["Value"] = params["UserAgent"]
+        multi_launcher.options["Proxy"]["Value"] = params["Proxy"]
+        multi_launcher.options["ProxyCreds"]["Value"] = params["ProxyCreds"]
+        multi_launcher.options["Obfuscate"]["Value"] = params["Obfuscate"]
+        multi_launcher.options["ObfuscateCommand"]["Value"] = params["ObfuscateCommand"]
+        multi_launcher.options["Bypasses"]["Value"] = params["Bypasses"]
         launcher = multi_launcher.generate()
 
         if launcher == "":
@@ -84,5 +84,6 @@ class Module:
         script_end += "Start-Sleep -s 5"
         script_end += "\r\n"
         script_end += code_exec
+        script_end += '\r\n"Invoke-NTSD completed."'
 
         return script, script_end

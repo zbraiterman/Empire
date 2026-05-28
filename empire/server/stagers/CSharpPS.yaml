@@ -55,31 +55,7 @@
   TokenTask: false
   Options: []
   ReferenceSourceLibraries: []
-  ReferenceAssemblies:
-    - Name: System.Management.Automation.dll
-      Location: net35\System.Management.Automation.dll
-      DotNetVersion: Net35
-    - Name: System.Management.Automation.dll
-      Location: net40\System.Management.Automation.dll
-      DotNetVersion: Net40
-    - Name: System.Core.dll
-      Location: net40\System.Core.dll
-      DotNetVersion: Net40
-    - Name: System.Core.dll
-      Location: net35\System.Core.dll
-      DotNetVersion: Net35
-    - Name: System.dll
-      Location: net40\System.dll
-      DotNetVersion: Net40
-    - Name: System.dll
-      Location: net35\System.dll
-      DotNetVersion: Net35
-    - Name: mscorlib.dll
-      Location: net40\mscorlib.dll
-      DotNetVersion: Net40
-    - Name: mscorlib.dll
-      Location: net35\mscorlib.dll
-      DotNetVersion: Net35
+  ReferenceAssemblies: []
   EmbeddedResources:
     - Name: launcher.txt
-      Location: launcher.txt
+      Location: common\launcher.txt

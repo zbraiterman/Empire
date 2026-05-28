@@ -38,7 +38,7 @@ router = APIRouter(
     "/",
     response_model=ListenerTemplates,
 )
-async def get_listener_templates(
+def get_listener_templates(
     listener_template_service: ListenerTemplateServiceDep,
 ):
     templates = [
@@ -53,7 +53,7 @@ async def get_listener_templates(
     "/{uid}",
     response_model=ListenerTemplate,
 )
-async def get_listener_template(
+def get_listener_template(
     uid: str,
     listener_template_service: ListenerTemplateServiceDep,
 ):

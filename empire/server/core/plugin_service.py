@@ -181,6 +181,29 @@ class PluginService:
 
         plugin_obj.enabled = db_plugin.enabled
 
+    def _validate_and_load_plugin(
+        self, db, temp_dir, subdir, version_name, registry_data
+    ):
+        """Shared post-download logic: validate, merge config, load."""
+        temp_dir = temp_dir / subdir if subdir else temp_dir
+        plugin_dir, plugin_config = self._validate_temp_plugin(db, temp_dir)
+        plugin_config = self._merge_plugin_config(plugin_config, registry_data)
+        self.load_plugin(db, plugin_dir, plugin_config, version_name)
+
+    def _download_tar(self, tar_url):
+        """Download and extract a tar archive. Returns the temp directory."""
+        temp_dir = (
+            Path(tempfile.gettempdir()) / Path(tar_url.rsplit("/", maxsplit=1)[-1]).stem
+        )
+        response = s.get(tar_url, stream=True)
+        if response.status_code != HTTP_200_OK:
+            raise PluginValidationException(
+                f"Failed to download plugin: {response.text}"
+            )
+        with tarfile.open(fileobj=response.raw, mode="r|*") as tar:
+            tar.extractall(path=temp_dir)
+        return temp_dir
+
     def install_plugin_from_git(  # noqa: PLR0913
         self,
         db: Session,
@@ -191,11 +214,9 @@ class PluginService:
         registry_data: dict | None = None,
     ):
         temp_dir = git_util.clone_git_repo(git_url, ref)
-        temp_dir = temp_dir / subdir if subdir else temp_dir
-        plugin_dir, plugin_config = self._validate_temp_plugin(db, temp_dir)
-        plugin_config = self._merge_plugin_config(plugin_config, registry_data)
-
-        self.load_plugin(db, plugin_dir, plugin_config, version_name)
+        self._validate_and_load_plugin(
+            db, temp_dir, subdir, version_name, registry_data
+        )
 
     def install_plugin_from_tar(
         self,
@@ -205,26 +226,10 @@ class PluginService:
         version_name: str | None = None,
         registry_data: dict | None = None,
     ):
-        temp_dir = (
-            Path(tempfile.gettempdir()) / Path(tar_url.rsplit("/", maxsplit=1)[-1]).stem
+        temp_dir = self._download_tar(tar_url)
+        self._validate_and_load_plugin(
+            db, temp_dir, subdir, version_name, registry_data
         )
-
-        response = s.get(tar_url, stream=True)
-
-        if response.status_code != HTTP_200_OK:
-            raise PluginValidationException(
-                f"Failed to download plugin: {response.text}"
-            )
-
-        with tarfile.open(fileobj=response.raw, mode="r|*") as tar:
-            tar.extractall(path=temp_dir)
-
-        temp_dir = temp_dir / subdir if subdir else temp_dir
-
-        plugin_dir, plugin_config = self._validate_temp_plugin(db, temp_dir)
-        plugin_config = self._merge_plugin_config(plugin_config, registry_data)
-
-        self.load_plugin(db, plugin_dir, plugin_config, version_name)
 
     @staticmethod
     def _merge_plugin_config(plugin_config, registry_data):

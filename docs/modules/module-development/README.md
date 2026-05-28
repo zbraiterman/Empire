@@ -79,7 +79,28 @@ Empire modules support advanced configuration for dynamic dependencies between o
 
 ### Dynamic Option Dependencies
 
-The `depends_on` field allows an option to be displayed or required based on the value of another option. In this example, the `CredID` option only appears if the `Credentials` option is set to `CredID`.
+The `depends_on` field allows an option to be displayed or required based on the value of another option. When a dependency is not met, the option is hidden from the UI and skipped during validation — but its default value is still passed to the module's `generate()` function so that code accessing the parameter does not fail.
+
+If an option has both `required: true` and `depends_on`, it is **conditionally required**: the option must be provided only when its dependency condition is met. This is useful for options like `Listener` (required when `Payload=Empire`) or `Command` (required when `Payload=Manual`).
+
+```yaml
+  - name: Listener
+    description: Listener to use.
+    required: true
+    value: ''
+    depends_on:
+      - name: Payload
+        values: ['Empire']
+  - name: Command
+    description: Custom command to run.
+    required: true
+    value: ''
+    depends_on:
+      - name: Payload
+        values: ['Manual']
+```
+
+In this example, when `Payload` is set to `Empire`, the `Listener` option is required and `Command` is hidden. When `Payload` is set to `Manual`, the reverse applies.
 
 **Example: Switching Between URL and File Inputs**
 

@@ -18,6 +18,26 @@ from empire.server.server import run
 
 log = logging.getLogger(__name__)
 
+
+def _auto_install_plugins(main, auto_install):
+    with SessionLocal.begin() as db:
+        for entry in auto_install:
+            try:
+                main.pluginregistriesv2.install_plugin(
+                    db, entry.name, entry.version, entry.registry
+                )
+                log.info(
+                    f"Auto-install: plugin '{entry.name}' v{entry.version} installed"
+                )
+            except PluginValidationException as e:
+                log.info(f"Auto-install: skipping '{entry.name}': {e}")
+            except Exception:
+                log.error(
+                    f"Auto-install: failed to install '{entry.name}'",
+                    exc_info=True,
+                )
+
+
 if __name__ == "__main__":
     args = arguments.args
 
@@ -34,22 +54,7 @@ if __name__ == "__main__":
             base.startup_db()
             main = empire.MainMenu(args=args)
 
-            with SessionLocal.begin() as db:
-                for entry in auto_install:
-                    try:
-                        main.pluginregistriesv2.install_plugin(
-                            db, entry.name, entry.version, entry.registry
-                        )
-                        log.info(
-                            f"Auto-install: plugin '{entry.name}' v{entry.version} installed"
-                        )
-                    except PluginValidationException as e:
-                        log.info(f"Auto-install: skipping '{entry.name}': {e}")
-                    except Exception:
-                        log.error(
-                            f"Auto-install: failed to install '{entry.name}'",
-                            exc_info=True,
-                        )
+            _auto_install_plugins(main, auto_install)
 
             main.shutdown()
 

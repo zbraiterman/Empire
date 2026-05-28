@@ -27,6 +27,21 @@ The Go agent (`Gopire`) is designed for use in environments where Go is advantag
 
 Additional documentation on the agent can be found [here](./go/README.md).
 
+## C Agent
+The C agent (`Cpire`) is an experimental native agent modeled after the Go agent. It compiles into a standalone binary and supports Windows and Linux targets. **Currently, the C agent supports the HTTP listener only.**
+
+The C agent is only available in the [Sponsors](https://github.com/sponsors/BC-SECURITY) version of Empire.
+
+### Features
+- Cross-platform: supports Windows and Linux targets.
+- Native compiled binary with no runtime dependencies.
+- Runs PowerShell, C#, BOF, and shell taskings.
+- Full DH key exchange staging with Ed25519 certificate verification.
+- File download/upload and directory listing.
+- Agent controls: delay/jitter, kill date, working hours, lost-limit enforcement.
+
+Additional documentation on the agent can be found [here](./c/README.md).
+
 ## PowerShell Agent
 The PowerShell agent is the original agent for Empire.
 

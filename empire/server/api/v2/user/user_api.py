@@ -48,7 +48,7 @@ router = APIRouter(
 )
 
 
-async def get_user(uid: int, db: CurrentSession, user_service: UserServiceDep):
+def get_user(uid: int, db: CurrentSession, user_service: UserServiceDep):
     user = user_service.get_by_id(db, uid)
 
     if user:
@@ -64,7 +64,7 @@ OAuth2FormDep = Annotated[OAuth2PasswordRequestForm, Depends()]
 
 
 @router.post("/token", response_model=Token)
-async def login_for_access_token(
+def login_for_access_token(
     db: CurrentSession,
     form_data: OAuth2FormDep,
 ):
@@ -83,7 +83,7 @@ async def login_for_access_token(
 
 
 @router.get("/api/v2/users/me", response_model=User)
-async def read_user_me(current_user: CurrentActiveUser):
+def read_user_me(current_user: CurrentActiveUser):
     return domain_to_dto_user(current_user)
 
 
@@ -92,7 +92,7 @@ async def read_user_me(current_user: CurrentActiveUser):
     response_model=Users,
     dependencies=[Depends(get_current_active_user)],
 )
-async def read_users(db: CurrentSession, user_service: UserServiceDep):
+def read_users(db: CurrentSession, user_service: UserServiceDep):
     users = [domain_to_dto_user(x) for x in user_service.get_all(db)]
 
     return {"records": users}
@@ -103,7 +103,7 @@ async def read_users(db: CurrentSession, user_service: UserServiceDep):
     response_model=User,
     dependencies=[Depends(get_current_active_user)],
 )
-async def read_user(uid: int, db_user: UserDep):
+def read_user(uid: int, db_user: UserDep):
     return domain_to_dto_user(db_user)
 
 
@@ -112,7 +112,7 @@ async def read_user(uid: int, db_user: UserDep):
     status_code=201,
     dependencies=[Depends(get_current_active_admin_user)],
 )
-async def create_user(
+def create_user(
     user: UserPostRequest,
     db: CurrentSession,
     user_service: UserServiceDep,
@@ -128,7 +128,7 @@ async def create_user(
 
 
 @router.put("/api/v2/users/{uid}", response_model=User)
-async def update_user(
+def update_user(
     uid: int,
     user_req: UserUpdateRequest,
     current_user: CurrentActiveUser,
@@ -157,7 +157,7 @@ async def update_user(
 
 
 @router.put("/api/v2/users/{uid}/password", response_model=User)
-async def update_user_password(
+def update_user_password(
     uid: int,
     user_req: UserUpdatePasswordRequest,
     current_user: CurrentActiveUser,
@@ -182,7 +182,7 @@ async def update_user_password(
 
 
 @router.post("/api/v2/users/{uid}/avatar", status_code=201)
-async def create_avatar(
+def create_avatar(
     uid: int,
     user: CurrentActiveUser,
     db: CurrentSession,

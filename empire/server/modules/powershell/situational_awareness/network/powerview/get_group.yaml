@@ -53,9 +53,13 @@ options:
     required: false
     value: ''
   - name: AdminCount
-    description: Switch. Return users with "(adminCount=1)" (meaning are/were privileged).
+    description: Return users with "(adminCount=1)" (meaning are/were privileged).
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: LDAPFilter
     description: A customized ldap filter string to use, e.g. "(description=*admin*)"
     required: false

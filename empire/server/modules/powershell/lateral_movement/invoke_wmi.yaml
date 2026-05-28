@@ -67,21 +67,21 @@ options:
     value: ''
   - name: Listener
     description: Listener to use.
-    required: false
+    required: true
     value: ''
     depends_on:
       - name: Payload
         values: ['Empire']
   - name: Command
     description: Custom command to run.
-    required: false
+    required: true
     value: ''
     depends_on:
       - name: Payload
         values: ['Manual']
   - name: Obfuscate
-    description: Switch. Obfuscate the launcher powershell code, uses the ObfuscateCommand
-      for obfuscation types. For powershell only.
+    description: Obfuscate the launcher powershell code, uses the ObfuscateCommand
+      for obfuscation types.
     required: false
     value: 'False'
     strict: true
@@ -89,8 +89,7 @@ options:
       - True
       - False
   - name: ObfuscateCommand
-    description: The Invoke-Obfuscation command to use. Only used if Obfuscate switch
-      is True. For powershell only.
+    description: The Invoke-Obfuscation command to use.
     required: false
     value: Token\All\1
     depends_on:

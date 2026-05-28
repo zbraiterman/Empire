@@ -45,16 +45,21 @@ class Stager:
                 "Value": "launcher.exe",
             },
             "Obfuscate": {
-                "Description": "Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types. For powershell only.",
+                "Description": "Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types.",
                 "Required": False,
                 "Value": "False",
                 "SuggestedValues": ["True", "False"],
                 "Strict": True,
+                "DependsOn": [{"name": "Language", "values": ["powershell"]}],
             },
             "ObfuscateCommand": {
-                "Description": "The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.",
+                "Description": "The Invoke-Obfuscation command to use.",
                 "Required": False,
                 "Value": r"Token\All\1",
+                "DependsOn": [
+                    {"name": "Language", "values": ["powershell"]},
+                    {"name": "Obfuscate", "values": ["True"]},
+                ],
             },
             "SafeChecks": {
                 "Description": "Checks for LittleSnitch or a SandBox, exit the staging process if true. Defaults to True.",

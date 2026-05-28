@@ -351,6 +351,7 @@ class AgentTaskService:
             module_req.ignore_language_version_check,
             module_req.ignore_admin_check,
             modified_input=module_req.modified_input,
+            background_override=module_req.background_override,
         )
 
         if err:
@@ -507,7 +508,9 @@ class AgentTaskService:
                 location.parent.mkdir(parents=True, exist_ok=True)
                 location.write_text(task_input)
 
-        hooks.run_hooks(hooks.AFTER_TASKING_HOOK, db, task)
+        db.expunge(task)
+        hooks.run_hooks(hooks.AFTER_TASKING_HOOK, None, task)
+        db.add(task)
 
         message = f"Agent {agent.session_id} tasked with task ID {pk}"
         log.info(message)

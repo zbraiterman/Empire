@@ -95,4 +95,6 @@ This will write out "Is Elevated: True" to C:\UACBypassTest.
          Remove-ItemProperty -Force -Path $PayloadPath -Name $PayloadKey
          Write-Verbose "Removed registry entries"
      }
+
+     "Invoke-EnvBypass completed."
 }

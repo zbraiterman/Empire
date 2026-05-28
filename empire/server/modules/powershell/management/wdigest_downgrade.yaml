@@ -44,7 +44,7 @@ options:
       - True
       - False
   - name: Cleanup
-    description: Switch. Disable the registry key.
+    description: Disable the registry key.
     required: false
     value: 'False'
     strict: true

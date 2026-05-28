@@ -1086,5 +1086,5 @@ param(
         ElevateProcess $ProcID $Binary $Arguments
     }
 
-
+    "Invoke-BypassUACTokenManipulation completed."
 }

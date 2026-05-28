@@ -45,7 +45,7 @@ router = APIRouter(
 )
 
 
-async def get_plugin(
+def get_plugin(
     plugin_id: str,
     db: CurrentSession,
     plugin_service: PluginServiceDep,
@@ -61,7 +61,7 @@ async def get_plugin(
 PluginDep = Annotated[PluginHolder, Depends(get_plugin)]
 
 
-async def get_loaded_plugin(plugin_id: str, plugin_holder: PluginDep) -> PluginHolder:
+def get_loaded_plugin(plugin_id: str, plugin_holder: PluginDep) -> PluginHolder:
     if plugin_holder.loaded_plugin:
         return plugin_holder
 
@@ -72,13 +72,13 @@ LoadedPluginDep = Annotated[PluginHolder, Depends(get_loaded_plugin)]
 
 
 @router.get("/", response_model=Plugins)
-async def read_plugins(db: CurrentSession, plugin_service: PluginServiceDep):
+def read_plugins(db: CurrentSession, plugin_service: PluginServiceDep):
     plugins = plugin_service.get_all(db)
     return {"records": [domain_to_dto_plugin(x, db) for x in plugins]}
 
 
 @router.get("/{plugin_id}")
-async def read_plugin(
+def read_plugin(
     plugin_id: str,
     db: CurrentSession,
     plugin: PluginDep,
@@ -87,7 +87,7 @@ async def read_plugin(
 
 
 @router.post("/{plugin_id}/execute", response_model=PluginExecuteResponse)
-async def execute_plugin(
+def execute_plugin(
     plugin_id: str,
     plugin_req: PluginExecutePostRequest,
     db: CurrentSession,
@@ -114,7 +114,7 @@ async def execute_plugin(
 
 
 @router.put("/{plugin_id}", status_code=200)
-async def update_plugin(
+def update_plugin(
     plugin_id: str,
     plugin_update_req: PluginUpdateRequest,
     db: CurrentSession,
@@ -131,7 +131,7 @@ async def update_plugin(
 
 
 @router.put("/{plugin_id}/settings", status_code=200)
-async def update_plugin_settings(
+def update_plugin_settings(
     plugin_id: str,
     plugin_settings: dict,
     db: CurrentSession,
@@ -145,7 +145,7 @@ async def update_plugin_settings(
 
 
 @router.post("/reload", status_code=204, response_class=Response)
-async def reload_plugins(
+def reload_plugins(
     db: CurrentSession,
     plugin_service: PluginServiceDep,
 ):
@@ -154,7 +154,7 @@ async def reload_plugins(
 
 
 @router.post("/install/git")
-async def install_plugin_git(
+def install_plugin_git(
     req: PluginInstallGitRequest,
     db: CurrentSession,
     plugin_service: PluginServiceDep,
@@ -167,10 +167,15 @@ async def install_plugin_git(
         ) from e
     except PluginValidationException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error installing plugin: {type(e).__name__}: {e}",
+        ) from e
 
 
 @router.post("/install/tar")
-async def install_plugin_tar(
+def install_plugin_tar(
     req: PluginInstallTarRequest,
     db: CurrentSession,
     plugin_service: PluginServiceDep,
@@ -179,3 +184,8 @@ async def install_plugin_tar(
         plugin_service.install_plugin_from_tar(db, req.url, req.subdirectory)
     except PluginValidationException as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error installing plugin: {type(e).__name__}: {e}",
+        ) from e

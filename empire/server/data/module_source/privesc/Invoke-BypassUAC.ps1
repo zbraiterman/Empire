@@ -607,4 +607,6 @@ function Invoke-BypassUAC
 
     Write-Verbose "Removing temporary payload $TempPayloadPath"
     Remove-Item -Path $TempPayloadPath -Force
+
+    "Invoke-BypassUAC completed."
 }

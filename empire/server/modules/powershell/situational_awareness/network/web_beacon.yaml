@@ -1,0 +1,60 @@
+name: Web-Beacon
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Sends HTTP requests with configurable user agent strings to a
+  target URL, simulating command and control beaconing over web
+  protocols. This can be used to test network monitoring and
+  detection capabilities. Supports custom user agent strings
+  including known malicious user agents used by APT groups and
+  commodity malware.
+software: ''
+tactics: [TA0011]
+techniques: [T1071.001]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Url
+    description: Target URL to beacon to.
+    required: true
+    value: 'https://www.google.com'
+  - name: UserAgent
+    description: User agent string for the request.
+    required: false
+    value: 'HttpBrowser/1.0'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-WebBeacon {
+      param(
+          [string]$Url,
+          [string]$UserAgent = "HttpBrowser/1.0"
+      )
+
+      Write-Output "[*] Sending web beacon..."
+      Write-Output "[*] URL: $Url"
+      Write-Output "[*] User-Agent: $UserAgent"
+
+      try {
+          $response = Invoke-WebRequest -Uri $Url -UserAgent $UserAgent -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+          Write-Output "[+] Response Status: $($response.StatusCode) $($response.StatusDescription)"
+          Write-Output "[+] Content Length: $($response.Content.Length) bytes"
+          Write-Output "[+] Beacon sent successfully."
+      } catch {
+          Write-Output "[-] Request failed: $_"
+      }
+  }
+script_end: Invoke-WebBeacon {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

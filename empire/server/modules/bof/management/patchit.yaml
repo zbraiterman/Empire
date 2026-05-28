@@ -1,0 +1,45 @@
+name: patchit
+authors:
+  - name: ScriptIdiot
+    handle: '@ScriptIdiot'
+    link: https://github.com/ScriptIdiot
+description: |
+  Beacon Object File (BOF) that provides all-in-one AMSI and ETW patching,
+  checking, and reverting for x64 processes. Supports indirect syscalls and
+  callback unhooking. Can patch AMSI only, ETW only, or both simultaneously,
+  and can also revert patches to restore original functionality.
+software: ''
+tactics: [TA0005]
+techniques: [T1562.001]
+background: false
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: bof
+min_language_version: ''
+comments:
+  - https://github.com/sliverarmory/BOF-patchit
+options:
+  - name: Mode
+    description: 'Operation mode: check, all (patch AMSI+ETW), amsi, etw, revertAll,
+      revertAmsi, revertEtw.'
+    required: true
+    value: all
+    strict: true
+    suggested_values:
+      - check
+      - all
+      - amsi
+      - etw
+      - revertAll
+      - revertAmsi
+      - revertEtw
+bof:
+  x86: ''
+  x64: bof/patchit/patchit.x64.o
+  entry_point: ''
+  format_string: i
+script_path: ''
+script_end: ''
+advanced:
+  custom_generate: true

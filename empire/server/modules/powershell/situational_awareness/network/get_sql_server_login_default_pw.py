@@ -1,4 +1,5 @@
 from empire.server.common.empire import MainMenu
+from empire.server.core.exceptions import ModuleValidationException
 from empire.server.core.module_models import EmpireModule
 
 
@@ -11,39 +12,47 @@ class Module:
         obfuscate: bool = False,
         obfuscation_command: str = "",
     ):
+        instance = params["Instance"]
+        check_all = params["CheckAll"].lower() == "true"
         username = params["Username"]
         password = params["Password"]
-        instance = params["Instance"]
-        check_all = params["CheckAll"]
+
+        # Always need Get-SQLServerLoginDefaultPw
+        script, _err = main_menu.modulesv2.get_module_source(
+            module_name="recon/Get-SQLServerLoginDefaultPw.ps1",
+            obfuscate=obfuscate,
+            obfuscate_command=obfuscation_command,
+        )
 
         if check_all:
-            # read in the common module source code
-            script, _err = main_menu.modulesv2.get_module_source(
-                module_name="recon/Get-SQLInstanceDomain.ps1",
+            # Also load Get-SQLInstanceDomain to discover instances
+            script2, _err = main_menu.modulesv2.get_module_source(
+                module_name="situational_awareness/network/Get-SQLInstanceDomain.ps1",
                 obfuscate=obfuscate,
                 obfuscate_command=obfuscation_command,
             )
+            script += "\n" + script2
 
-            script_end = " Get-SQLInstanceDomain "
+            script_end = "Get-SQLInstanceDomain"
             if username != "":
                 script_end += " -Username " + username
             if password != "":
                 script_end += " -Password " + password
-            script_end += " | Select Instance | "
-        script_end += " Get-SQLServerLoginDefaultPw"
+            script_end += " | Get-SQLServerLoginDefaultPw"
 
-        if instance != "" and not check_all:
-            # read in the common module source code
-            script, _err = main_menu.modulesv2.get_module_source(
-                module_name="recon/Get-SQLServerLoginDefaultPw.ps1",
-                obfuscate=obfuscate,
-                obfuscate_command=obfuscation_command,
+        elif instance != "":
+            script_end = "Get-SQLServerLoginDefaultPw"
+            script_end += " -Instance '" + instance + "'"
+
+        else:
+            raise ModuleValidationException(
+                "Either CheckAll or Instance must be specified."
             )
-            script_end += " -Instance " + instance
 
         return main_menu.modulesv2.finalize_module(
             script=script,
             script_end=script_end,
             obfuscate=obfuscate,
             obfuscation_command=obfuscation_command,
+            script_already_obfuscated=obfuscate,
         )

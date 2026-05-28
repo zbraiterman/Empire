@@ -203,6 +203,45 @@ def test_no_user_config_uses_base_only(tmp_path):
     assert config.database.use == "sqlite"
 
 
+def test_obfuscation_timeout_default():
+    """obfuscation.timeout defaults to 300 when not set in config."""
+    server_config_dict = load_test_config()
+    config = EmpireConfig(server_config_dict)
+    assert config.obfuscation.timeout == 300  # noqa: PLR2004
+
+
+def test_obfuscation_timeout_custom():
+    """obfuscation.timeout can be overridden via config dict."""
+    server_config_dict = load_test_config()
+    server_config_dict["obfuscation"] = {"timeout": 600}
+    config = EmpireConfig(server_config_dict)
+    assert config.obfuscation.timeout == 600  # noqa: PLR2004
+
+
+def test_env_overrides_obfuscation_timeout(monkeypatch):
+    """EMPIRE_OBFUSCATION__TIMEOUT env var overrides the config value."""
+    server_config_dict = load_test_config()
+    monkeypatch.setenv("EMPIRE_OBFUSCATION__TIMEOUT", "900")
+    config = EmpireConfig(server_config_dict)
+    assert config.obfuscation.timeout == 900  # noqa: PLR2004
+
+
+def test_obfuscation_timeout_rejects_negative():
+    """obfuscation.timeout must be >= 0."""
+    server_config_dict = load_test_config()
+    server_config_dict["obfuscation"] = {"timeout": -1}
+    with pytest.raises(ValueError, match="greater than or equal to 0"):
+        EmpireConfig(server_config_dict)
+
+
+def test_obfuscation_timeout_zero_is_valid():
+    """obfuscation.timeout of 0 means no timeout."""
+    server_config_dict = load_test_config()
+    server_config_dict["obfuscation"] = {"timeout": 0}
+    config = EmpireConfig(server_config_dict)
+    assert config.obfuscation.timeout == 0
+
+
 @pytest.mark.usefixtures("_isolated_config")
 def test_user_config_deep_merges_nested_dicts(tmp_path):
     """User config overrides nested fields without clobbering siblings."""

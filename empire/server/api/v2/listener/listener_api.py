@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
@@ -20,6 +21,8 @@ from empire.server.api.v2.tag import tag_api
 from empire.server.core.db import models
 from empire.server.core.listener_service import ListenerService
 
+log = logging.getLogger(__name__)
+
 
 def get_listener_service(main: AppCtx) -> ListenerService:
     return main.listenersv2
@@ -39,7 +42,7 @@ router = APIRouter(
 )
 
 
-async def get_listener(
+def get_listener(
     uid: int,
     db: CurrentSession,
     listener_service: ListenerServiceDep,
@@ -59,12 +62,12 @@ tag_api.add_endpoints_to_taggable(router, "/{uid}/tags", get_listener)
 
 
 @router.get("/{uid}", response_model=Listener)
-async def read_listener(uid: int, db_listener: ListenerDep):
+def read_listener(uid: int, db_listener: ListenerDep):
     return domain_to_dto_listener(db_listener)
 
 
 @router.get("/", response_model=Listeners)
-async def read_listeners(
+def read_listeners(
     db: CurrentSession,
     listener_service: ListenerServiceDep,
 ):
@@ -74,17 +77,11 @@ async def read_listeners(
 
 
 @router.post("/", status_code=201, response_model=Listener)
-async def create_listener(
+def create_listener(
     listener_req: ListenerPostRequest,
     db: CurrentSession,
     listener_service: ListenerServiceDep,
 ):
-    """
-    Note: options['Name'] will be overwritten by name. When v1 api is eventually removed, it wil no longer be needed.
-    :param listener_req:
-    :param db
-    :return:
-    """
     resp, err = listener_service.create_listener(db, listener_req)
 
     if err:
@@ -94,7 +91,7 @@ async def create_listener(
 
 
 @router.put("/{uid}", response_model=Listener)
-async def update_listener(
+def update_listener(
     uid: int,
     listener_req: ListenerUpdateRequest,
     db: CurrentSession,
@@ -121,7 +118,19 @@ async def update_listener(
         )
     if not listener_req.enabled and db_listener.enabled:
         # disable and update
-        listener_service.stop_listener(db_listener)
+        try:
+            listener_service.stop_listener(db_listener)
+        except Exception as e:
+            log.error(
+                'Failed to stop listener "%s": %s',
+                db_listener.name,
+                e,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f'Failed to stop listener "{db_listener.name}": {e}',
+            ) from e
         resp, err = listener_service.update_listener(db, db_listener, listener_req)
 
         if err:
@@ -145,7 +154,7 @@ async def update_listener(
     status_code=HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def delete_listener(
+def delete_listener(
     uid: int,
     db: CurrentSession,
     db_listener: ListenerDep,
@@ -155,7 +164,7 @@ async def delete_listener(
 
 
 @router.put("/{uid}/autorun", response_model=Listener)
-async def update_listener_autorun(
+def update_listener_autorun(
     uid: int,
     autorun_config: AutorunConfig,
     db: CurrentSession,
@@ -169,7 +178,7 @@ async def update_listener_autorun(
 
 
 @router.get("/{uid}/autorun", response_model=AutorunConfig)
-async def get_listener_autorun(
+def get_listener_autorun(
     uid: int,
     db_listener: ListenerDep,
 ):

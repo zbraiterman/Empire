@@ -56,11 +56,16 @@ class StarkillerConfig(EmpireBaseModel):
 
 
 class EmpireCompilerConfig(EmpireBaseModel):
-    archive: str = ""
+    repo: str = ""
+    ref: str = ""
     confuser_proj: str = ""
     # This is only used if you are using a self-compiled
     # version that is not already tarred and published.
     directory: str | None = None
+
+
+class ObfuscationSettings(EmpireBaseModel):
+    timeout: int = Field(default=300, ge=0)
 
 
 class DatabaseDefaultObfuscationConfig(EmpireBaseModel):
@@ -108,6 +113,10 @@ class MySQLDatabaseConfig(EmpireBaseModel):
     username: str = ""
     password: str = ""
     database_name: str = "empire"
+    pool_size: int = 10
+    max_overflow: int = 15
+    pool_pre_ping: bool = True
+    pool_recycle: int = 3600
 
 
 class DatabaseConfig(EmpireBaseModel):
@@ -178,6 +187,7 @@ class PluginMarketplaceConfig(EmpireBaseModel):
 
 class EmpireConfig(BaseSettings):
     suppress_self_cert_warning: bool = Field(default=True)
+    obfuscation: ObfuscationSettings = ObfuscationSettings()
     api: ApiConfig = ApiConfig()
     server: ServerConfig = ServerConfig()
     empire_compiler: EmpireCompilerConfig = EmpireCompilerConfig()

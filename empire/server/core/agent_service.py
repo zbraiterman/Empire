@@ -4,6 +4,9 @@ import typing
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, func
+from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from empire.server.api.v2.agent.agent_dto import AggregateBucket
@@ -12,7 +15,10 @@ from empire.server.common import helpers
 from empire.server.common.encryption import AESCipher
 from empire.server.core.config.config_manager import empire_config
 from empire.server.core.db import models
+from empire.server.core.db.models import get_database_config
 from empire.server.utils import datetime_util
+
+_DB_DIALECT, _ = get_database_config()
 
 if typing.TYPE_CHECKING:
     from empire.server.common.empire import MainMenu
@@ -130,26 +136,33 @@ class AgentService:
     @staticmethod
     def update_agent_lastseen(db: Session, session_id: str):
         """
-        Update the agent's last seen timestamp in the database.
+        Record the agent's check-in timestamp using an INSERT-ignore pattern.
 
-        This checks to see if a timestamp already exists for the agent and ignores
-        it if it does. It is not super efficient to check the database on every checkin.
-        A better alternative would be to find a way to configure sqlalchemy to ignore
-        duplicate inserts or do upserts.
+        Uses dialect-specific ON DUPLICATE KEY UPDATE (MySQL) or
+        INSERT OR IGNORE (SQLite) to skip duplicate (agent_id, checkin_time)
+        rows in a single query, avoiding the previous SELECT-then-INSERT
+        pattern.
         """
         checkin_time = datetime_util.getutcnow().replace(microsecond=0)
-        exists = (
-            db.query(models.AgentCheckIn)
-            .filter(
-                and_(
-                    models.AgentCheckIn.agent_id == session_id,
-                    models.AgentCheckIn.checkin_time == checkin_time,
-                )
+        values = {"agent_id": session_id, "checkin_time": checkin_time}
+
+        if _DB_DIALECT == "mysql":
+            stmt = mysql_insert(models.AgentCheckIn).values(**values)
+            # MySQL requires at least one column in ON DUPLICATE KEY UPDATE;
+            # setting agent_id to itself is a no-op to achieve INSERT IGNORE semantics.
+            stmt = stmt.on_duplicate_key_update(agent_id=session_id)
+        else:
+            stmt = sqlite_insert(models.AgentCheckIn).values(**values)
+            stmt = stmt.on_conflict_do_nothing()
+
+        try:
+            with db.begin_nested():
+                db.execute(stmt)
+        except IntegrityError:
+            log.debug(
+                "Agent %s check-in skipped: agent may have been deleted",
+                session_id,
             )
-            .first()
-        )
-        if not exists:
-            db.add(models.AgentCheckIn(agent_id=session_id, checkin_time=checkin_time))
 
     @staticmethod
     def get_agent_checkins(  # noqa: PLR0913

@@ -49,9 +49,14 @@ async def _run_async_hook(hook: Callable, *args) -> None:
     the object as pending (new). On commit, SQLAlchemy tries to INSERT the
     row, hitting a 50-second MySQL lock wait on the uncommitted PK.
 
-    If args[0] is not a Session, args are forwarded unchanged.
+    If args[0] is None, a fresh session is opened and passed to the hook.
+    This allows callers to request a managed session without holding their
+    own connection — eliminating the 2x connection amplification that
+    occurs when hooks fire inside an open session block.
+
+    If args[0] is not a Session (and not None), args are forwarded unchanged.
     """
-    if args and isinstance(args[0], Session):
+    if args and (isinstance(args[0], Session) or args[0] is None):
         rest = args[1:]
         with SessionLocal.begin() as db:
             merged = [
@@ -150,9 +155,16 @@ class Hooks:
             self.filters[event].pop(name)
 
     def run_hooks(self, event: str, *args):
-        """
-        Run all hooks for a hook type.
-        This could be updated to run each hook async.
+        """Run all hooks for a hook type.
+
+        If args[0] is None, both sync and async hooks receive a fresh
+        managed DB session instead of None.  This is transparent to hook
+        authors — hooks always receive ``(db: Session, ...)`` regardless
+        of whether the caller passed a live session or None.
+
+        Callers pass None when they want hooks to get a session but
+        don't want to hold one themselves (avoids 2x pool connection
+        amplification when hooks fire inside an open session block).
         """
         if event not in self.hooks:
             return
@@ -174,6 +186,18 @@ class Hooks:
                         )
                     else:
                         asyncio.run(_run_async_hook(hook, *args))
+                elif args and args[0] is None:
+                    # Provide a fresh session for sync hooks when the
+                    # caller passed None (same convention as _run_async_hook).
+                    rest = args[1:]
+                    with SessionLocal.begin() as db:
+                        merged = [
+                            db.merge(arg, load=False)
+                            if hasattr(arg, "__mapper__")
+                            else arg
+                            for arg in rest
+                        ]
+                        hook(db, *merged)
                 else:
                     hook(*args)
             except Exception as e:

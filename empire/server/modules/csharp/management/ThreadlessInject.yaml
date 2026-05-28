@@ -36,19 +36,23 @@ options:
       - ironpython
   - name: Obfuscate
     description: Obfuscate the launcher powershell code, uses the ObfuscateCommand
-      for obfuscation types. For powershell only.
+      for obfuscation types.
     required: false
     value: 'False'
     strict: true
     suggested_values:
       - True
       - False
+    depends_on:
+      - name: Language
+        values: ['powershell']
   - name: ObfuscateCommand
-    description: The Invoke-Obfuscation command to use. Only used if Obfuscate switch
-      is True. For powershell only.
+    description: The Invoke-Obfuscation command to use.
     required: false
     value: Token\All\1
     depends_on:
+      - name: Language
+        values: ['powershell']
       - name: Obfuscate
         values: ['True']
   - name: Bypasses
@@ -134,31 +138,7 @@ csharp:
       Language: CSharp
       CompatibleDotNetVersions:
         - Net40
-      ReferenceAssemblies:
-        - Name: System.dll
-          Location: net40\System.dll
-          DotNetVersion: Net40
-        - Name: System.Core.dll
-          Location: net40\System.Core.dll
-          DotNetVersion: Net40
-        - Name: System.Data.dll
-          Location: net40\System.Data.dll
-          DotNetVersion: Net40
-        - Name: mscorlib.dll
-          Location: net40\mscorlib.dll
-          DotNetVersion: Net40
-        - Name: System.Drawing.dll
-          Location: net40\System.Drawing.dll
-          DotNetVersion: Net40
-        - Name: System.Runtime.Serialization.dll
-          Location: net40\System.Runtime.Serialization.dll
-          DotNetVersion: Net40
-        - Name: System.Xml.dll
-          Location: net40\System.XML.dll
-          DotNetVersion: Net40
-        - Name: System.Xml.Linq.dll
-          Location: net40\System.Xml.Linq.dll
-          DotNetVersion: Net40
+      ReferenceAssemblies: []
       EmbeddedResources: []
   ReferenceAssemblies: []
   EmbeddedResources: []

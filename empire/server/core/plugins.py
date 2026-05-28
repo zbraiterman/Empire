@@ -40,13 +40,13 @@ class BasePlugin:
             value.setdefault("SuggestedValues", [])
             value.setdefault("Strict", False)
             value.setdefault("Internal", False)
-            value.setdefault("Depends_on", [])
+            value.setdefault("DependsOn", [])
 
         for value in self.settings_options.values():
             value.setdefault("SuggestedValues", [])
             value.setdefault("Strict", False)
             value.setdefault("Internal", False)
-            value.setdefault("Depends_on", [])
+            value.setdefault("DependsOn", [])
 
     def set_initial_options(self, db):
         """

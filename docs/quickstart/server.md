@@ -31,6 +31,16 @@ Nested settings are deep-merged: overriding `database.mysql.password` in `config
 If using `--config /path/to/config.yaml`, Empire looks for `config.user.yaml` in the same directory as the specified config file.
 
 * **suppress-self-cert-warning** - Suppress the http warnings when launching an Empire instance that uses a self-signed cert.
+* **obfuscation** - Settings for the obfuscation subsystem.
+
+  * **timeout** - Maximum time in seconds allowed for a single PowerShell obfuscation subprocess. Large modules like PowerView (~4000 lines) and Invoke-Mimikatz (~12000 lines) may exceed the default on resource-constrained environments (e.g. single-CPU containers). Set to `0` to disable the timeout entirely. Also settable via the `EMPIRE_OBFUSCATION__TIMEOUT` environment variable.
+
+```yaml
+obfuscation:
+  # Default: 300
+  timeout: 600
+```
+
 * **api** - Configure the RESTful API.
 
 ip - The IP address to bind the API and Starkiller to. port - The port to bind the API and Starkiller to. secure - Enable HTTPS for the API and Starkiller. Browsers will not work with self-signed certs. Uses .key and .pem file from empire/server/data
@@ -44,7 +54,7 @@ api:
 
 * **database** - Configure Empire's database. Empire utilizes MySQL by default for high performance database operations. It can be configured to use sqlite for more lightweight implementations if required For more info on the database, see the [Database](https://github.com/BC-SECURITY/Empire/blob/main/docs/quickstart/database/README.md) section.
 
-MySQL supports customizing the default url, username, password, and database name. By default these are set to
+MySQL supports customizing the default url, username, password, database name, and connection pool settings. By default these are set to
 
 ```yaml
 database:
@@ -54,7 +64,13 @@ database:
     username: empire_user
     password: empire_password
     database_name: empire
+    pool_size: 10        # base connections kept open
+    max_overflow: 15     # extra connections allowed under load
+    pool_pre_ping: true  # detect stale connections before use
+    pool_recycle: 3600   # recycle connections after N seconds
 ```
+
+The connection pool defaults (25 total connections) handle typical deployments. For heavier workloads with many concurrent agents, increase `pool_size` and `max_overflow`.
 
 If using SQLite the database location is customizable with the default setting:
 
@@ -99,11 +115,16 @@ database:
 
 * **empire\_compiler** - Configure the Empire Compiler module. This block manages settings for the Empire Compiler, which is responsible for handling C# compilation tasks.
 
-archive: The URL to the Empire Compiler archive. The \{{platform\}} variable will be replaced with the current platform/architecture. (e.g. linux-amd64, linux-arm64)
+repo: The GitHub repository in `owner/name` format (e.g. `BC-SECURITY/Empire-Compiler`).
+ref: The release tag to download (e.g. `v0.4.4`). Empire queries the GitHub Releases API to find the matching platform asset.
+directory: (optional) Path to a local compiler directory. When set, Empire uses this directory directly instead of downloading from GitHub. Useful for testing local builds.
 
 ```yaml
 empire_compiler:
-  archive: https://github.com/BC-SECURITY/Empire-Compiler/releases/download/v0.3.2/EmpireCompiler-{{platform}}-v0.3.2.tgz
+  repo: BC-SECURITY/Empire-Compiler
+  ref: v0.4.4
+  # Uncomment to use a local compiler build instead of downloading:
+  # directory: /path/to/local/EmpireCompiler
 ```
 
 * **plugins** - Config related to plugins auto\_start - boolean, whether the plugin should start automatically. If this is not set, Empire will defer to the plugin's own configuration. auto\_execute - run an execute command on the plugin at startup. If this is not set, Empire will defer to the plugin's own configuration.

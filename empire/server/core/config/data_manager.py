@@ -26,7 +26,8 @@ def sync_starkiller(starkiller_config: StarkillerConfig):
     return starkiller_dir
 
 
-def sync_empire_compiler(compiler_config: EmpireCompilerConfig):
+def _resolve_compiler_platform():
+    """Return (os, arch) strings used in compiler asset names, or (None, None)."""
     os_ = platform.system()
     arch = platform.machine()
 
@@ -36,7 +37,7 @@ def sync_empire_compiler(compiler_config: EmpireCompilerConfig):
         os_ = "linux"
     else:
         log.error(f"Empire Compiler: unsupported OS '{os_}'")
-        return None
+        return None, None
 
     if arch == "x86_64":
         arch = "x64"
@@ -44,47 +45,113 @@ def sync_empire_compiler(compiler_config: EmpireCompilerConfig):
         arch = "arm64"
     else:
         log.error(f"Empire Compiler: unsupported architecture '{arch}'")
+        return None, None
+
+    return os_, arch
+
+
+def _resolve_compiler_download_url(
+    compiler_config: EmpireCompilerConfig, platform_str: str
+) -> str | None:
+    """Resolve the download URL for the compiler archive.
+
+    Queries the GitHub Releases API using ``repo`` and ``ref``.
+    """
+    if not compiler_config.repo or not compiler_config.ref:
+        log.error("Empire Compiler: 'repo' and 'ref' must be configured")
         return None
 
-    name = (
-        compiler_config.archive.split("/")[-1]
-        .removesuffix(".tgz")
-        .replace("{{platform}}", f"{os_}-{arch}")
+    api_url = f"https://api.github.com/repos/{compiler_config.repo}/releases/tags/{compiler_config.ref}"
+    log.info(f"Empire Compiler: querying GitHub release {api_url}")
+    resp = requests.get(api_url, timeout=30)
+    if not resp.ok:
+        log.error(
+            f"Empire Compiler: failed to fetch release info ({resp.status_code}): {resp.text}"
+        )
+        return None
+
+    assets = resp.json().get("assets", [])
+    for asset in assets:
+        name = asset.get("name", "")
+        if platform_str in name and name.endswith(".tgz"):
+            return asset["browser_download_url"]
+
+    log.error(
+        f"Empire Compiler: no matching asset for platform '{platform_str}' in release {compiler_config.ref}"
     )
+    return None
+
+
+def _configure_compiler(
+    compiler_config: EmpireCompilerConfig, extracted_folder: Path
+) -> Path:
+    """Write the ConfuserEx project file if it doesn't already exist."""
+    confuser_proj_dir = extracted_folder / "EmpireCompiler"
+    confuser_base_dir = confuser_proj_dir / "Data" / "Temp"
+    confuser_output_dir = confuser_base_dir / "confused_out"
+    confuser_project_file = confuser_base_dir / "empire.crproj"
+
+    if not confuser_project_file.exists():
+        confuser_template = Path(compiler_config.confuser_proj).read_text()
+        confuser_project_file.parent.mkdir(parents=True, exist_ok=True)
+        confuser_project_file.write_text(
+            confuser_template.format(
+                confuser_base_dir=confuser_base_dir,
+                confuser_output_dir=confuser_output_dir,
+                confuser_module_path="confused.exe",
+                confuser_proj_dir=confuser_proj_dir,
+            ),
+            encoding="utf-8",
+        )
+
+    return extracted_folder
+
+
+def sync_empire_compiler(compiler_config: EmpireCompilerConfig):
+    # Allow a local directory override so developers can test without
+    # publishing a GitHub release (mirrors how Starkiller handles this).
+    if compiler_config.directory:
+        local_dir = Path(compiler_config.directory)
+        if local_dir.exists():
+            log.info(f"Empire Compiler: using local directory {local_dir}")
+            return _configure_compiler(compiler_config, local_dir)
+        log.warning(
+            f"Empire Compiler: configured directory '{compiler_config.directory}' does not exist, falling back to download"
+        )
+
+    os_, arch = _resolve_compiler_platform()
+    if os_ is None:
+        return None
+
+    platform_str = f"{os_}-{arch}"
     compiler_dir = config_manager.DATA_DIR / "empire-compiler"
 
-    if not Path(compiler_dir / name).exists():
-        log.info("Empire Compiler: directory not found. Cloning Empire Compiler")
+    # Check for any existing directory matching this platform before hitting
+    # the GitHub API, so cached compilers don't require network access.
+    if compiler_dir.exists():
+        for d in compiler_dir.iterdir():
+            if d.is_dir() and platform_str in d.name:
+                log.info(f"Empire Compiler: using cached {d.name}")
+                return _configure_compiler(compiler_config, d)
 
-        url = compiler_config.archive.replace("{{platform}}", f"{os_}-{arch}")
+    url = _resolve_compiler_download_url(compiler_config, platform_str)
+    if url is None:
+        return None
+
+    name = url.split("/")[-1].removesuffix(".tgz")
+
+    if not Path(compiler_dir / name).exists():
+        log.info("Empire Compiler: directory not found. Downloading Empire Compiler")
         log.info(f"Empire Compiler: fetching and unarchiving {url}")
+        compiler_dir.mkdir(parents=True, exist_ok=True)
         with (
             requests.get(url, stream=True) as resp,
             tarfile.open(fileobj=resp.raw, mode="r|gz") as tar,
         ):
             tar.extractall(compiler_dir)
-    # The release version changes but folder structure should stay the same
-    extracted_folder = next(d for d in compiler_dir.iterdir() if d.is_dir())
-    confuser_proj_dir = str(extracted_folder) + "/EmpireCompiler"
-    confuser_project_name = "empire.crproj"
-    confuser_base_dir = f"{confuser_proj_dir}/Data/Temp"
-    confuser_output_dir = f"{confuser_proj_dir}/Data/Temp/confused_out"
-    confuser_module_path = "confused.exe"
 
-    confuser_template = Path(compiler_config.confuser_proj).read_text()
-    confuser_template = confuser_template.format(
-        confuser_base_dir=confuser_base_dir,
-        confuser_output_dir=confuser_output_dir,
-        confuser_module_path=confuser_module_path,
-        confuser_proj_dir=confuser_proj_dir,
-    )
-    if not Path(confuser_base_dir + "/" + confuser_project_name).exists():
-        with Path(confuser_base_dir + "/" + confuser_project_name).open(
-            "w", encoding="utf-8"
-        ) as f:
-            f.write(confuser_template)
-
-    return compiler_dir / name
+    extracted_folder = compiler_dir / name
+    return _configure_compiler(compiler_config, extracted_folder)
 
 
 def sync_plugin_registry(registry_config: PluginRegistryConfig):

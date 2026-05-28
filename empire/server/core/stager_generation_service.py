@@ -18,6 +18,7 @@ from empire.server.common import helpers, packets
 from empire.server.core.db import models
 from empire.server.core.db.base import SessionLocal
 from empire.server.utils import data_util
+from empire.server.utils.donut_util import donut_create
 
 if typing.TYPE_CHECKING:
     from empire.server.common.empire import MainMenu
@@ -43,6 +44,19 @@ class StagerGenerationService:
         self.agent_task_service = main_menu.agenttasksv2
         self.obfuscation_service = main_menu.obfuscationv2
         self.dotnet_compiler = main_menu.dotnet_compiler
+
+    def _write_launcher_resource(self, code: str) -> None:
+        """Write launcher code to the embedded resources directory for compilation.
+
+        This file path is shared across stager types (PowerShell and Python),
+        so concurrent stager generations can overwrite each other.
+        """
+        launcher_path = (
+            self.dotnet_compiler.compiler_dir
+            / "Data/EmbeddedResources/common/launcher.txt"
+        )
+        launcher_path.parent.mkdir(parents=True, exist_ok=True)
+        launcher_path.write_text(code, encoding="utf-8")
 
     def generate_launcher_fetcher(
         self,
@@ -152,11 +166,7 @@ class StagerGenerationService:
             encoding="utf-8"
         )
 
-        # Write text file to resources to be embedded
-        with (
-            self.dotnet_compiler.compiler_dir / "Data/EmbeddedResources/launcher.txt"
-        ).open("w") as f:
-            f.write(posh_code)
+        self._write_launcher_resource(posh_code)
 
         return self.dotnet_compiler.compile_stager(
             stager_yaml, "CSharpPS", dot_net_version=dot_net_version, confuse=obfuscate
@@ -177,7 +187,7 @@ class StagerGenerationService:
             log.warning(err, exc_info=True)
             return None, err
 
-        shellcode = donut.create(file=str(directory), arch=arch_type)
+        shellcode = donut_create(file=str(directory), arch=arch_type)
         return shellcode, None
 
     def generate_exe_oneliner(
@@ -319,13 +329,7 @@ class StagerGenerationService:
             encoding="utf-8"
         )
 
-        # Write text file to resources to be embedded
-        # This file is problematic because multiple runs
-        # can overwrite the file and cause issues.
-        with (
-            self.dotnet_compiler.compiler_dir / "Data/EmbeddedResources/launcher.txt"
-        ).open("w") as f:
-            f.write(python_code)
+        self._write_launcher_resource(python_code)
 
         return self.dotnet_compiler.compile_stager(
             stager_yaml, "CSharpPy", dot_net_version=dot_net_version, confuse=obfuscate
@@ -345,7 +349,7 @@ class StagerGenerationService:
             return None, err
 
         directory = self.generate_python_exe(posh_code, dot_net_version)
-        shellcode = donut.create(file=str(directory), arch=arch_type)
+        shellcode = donut_create(file=str(directory), arch=arch_type)
         return shellcode, None
 
     def generate_csharp_shellcode(
@@ -386,7 +390,7 @@ class StagerGenerationService:
             return None, "Failed to generate C# EXE for shellcode"
 
         # Create shellcode from the EXE
-        shellcode = donut.create(file=str(exe_path), arch=arch_type)
+        shellcode = donut_create(file=str(exe_path), arch=arch_type)
         return shellcode, None
 
     def generate_shellcode(  # noqa: PLR0913

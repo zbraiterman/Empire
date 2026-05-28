@@ -1,9 +1,13 @@
+import inspect
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
-from unittest.mock import ANY, Mock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 from starlette import status
+
+from empire.server.core.db.base import SessionLocal
+from empire.server.core.plugin_registry_service import PluginRegistryService
 
 if TYPE_CHECKING:
     from empire.server.common.empire import MainMenu
@@ -90,7 +94,7 @@ def test_install_plugin_version_not_found(client, admin_auth_header):
 
 @contextmanager
 def patch_install_plugin_from_git(plugin_service):
-    mock = Mock()
+    mock = MagicMock()
     original = plugin_service.install_plugin_from_git
     plugin_service.install_plugin_from_git = mock
 
@@ -133,7 +137,7 @@ def test_install_plugin_git(client, admin_auth_header, plugin_service):
 
 @contextmanager
 def patch_install_plugin_from_tar(plugin_service):
-    mock = Mock()
+    mock = MagicMock()
     original = plugin_service.install_plugin_from_tar
     plugin_service.install_plugin_from_tar = mock
 
@@ -163,3 +167,35 @@ def test_install_plugin_tar(client, admin_auth_header, plugin_service):
             "1.0.0",
             IsDict(),
         )
+
+
+def test_install_plugin_is_sync():
+    """install_plugin must be a plain def, not async def.
+
+    All Empire handlers now use def (not async def) so FastAPI dispatches
+    them to a thread pool.  install_plugin calls synchronous service
+    methods and should be sync too.
+    """
+    assert not inspect.iscoroutinefunction(PluginRegistryService.install_plugin)
+
+
+def test_install_plugin_calls_sync_service(plugin_registry_service, plugin_service):
+    """install_plugin must call the sync install_plugin_from_git method."""
+    mock_git = MagicMock()
+    original_git = plugin_service.install_plugin_from_git
+    plugin_service.install_plugin_from_git = mock_git
+
+    try:
+        with SessionLocal.begin() as db:
+            plugin_registry_service.install_plugin(db, "slack", "1.0.0", "BC-SECURITY")
+
+        mock_git.assert_called_once_with(
+            ANY,
+            "https://github.com/bc-security/slack-plugin",
+            None,
+            "v1.0.0",
+            "1.0.0",
+            IsDict(),
+        )
+    finally:
+        plugin_service.install_plugin_from_git = original_git

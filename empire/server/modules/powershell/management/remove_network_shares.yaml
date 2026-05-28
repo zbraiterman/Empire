@@ -1,0 +1,95 @@
+name: Remove-NetworkShares
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Removes network share connections and disables administrative shares
+  on a Windows target. Supports multiple methods including removing
+  all mapped network drives with net use, removing specific SMB
+  shares with Remove-SmbShare, disabling automatic administrative
+  share creation via registry, and removing default administrative
+  shares (C$, IPC$, ADMIN$).
+software: ''
+tactics: [TA0005]
+techniques: [T1070.005]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Method
+    description: >-
+      Method to use (disconnect_all, remove_share, disable_admin, remove_admin_shares).
+    required: true
+    value: 'disconnect_all'
+    suggested_values:
+      - disconnect_all
+      - remove_share
+      - disable_admin
+      - remove_admin_shares
+  - name: ShareName
+    description: Name of the share to remove (remove_share method only).
+    required: false
+    value: ''
+    depends_on:
+      - name: Method
+        values: ['remove_share']
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Remove-NetworkShares {
+      param(
+          [string]$Method = "disconnect_all",
+          [string]$ShareName
+      )
+
+      switch ($Method.ToLower()) {
+          "disconnect_all" {
+              $result = net use * /delete /y 2>&1
+              Write-Output "[+] Disconnected all network drives."
+              Write-Output $result
+          }
+          "remove_share" {
+              if (-not $ShareName) {
+                  Write-Output "[-] ShareName is required for remove_share method."
+                  return
+              }
+              try {
+                  Remove-SmbShare -Name $ShareName -Force -ErrorAction Stop
+                  Write-Output "[+] Removed SMB share: $ShareName"
+              } catch {
+                  $result = net share $ShareName /delete 2>&1
+                  Write-Output "[+] Attempted removal via net share: $ShareName"
+                  Write-Output $result
+              }
+          }
+          "disable_admin" {
+              $regPath = "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters"
+              reg add $regPath /v AutoShareServer /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+              reg add $regPath /v AutoShareWks /t REG_DWORD /d 0 /f 2>&1 | Out-Null
+              Write-Output "[+] Disabled automatic administrative share creation."
+              Write-Output "[+] Set AutoShareServer and AutoShareWks to 0."
+          }
+          "remove_admin_shares" {
+              $shares = @("C$", "IPC$", "ADMIN$")
+              foreach ($share in $shares) {
+                  $result = net share $share /delete 2>&1
+                  Write-Output "[+] Removed share $share : $result"
+              }
+          }
+          default {
+              Write-Output "[-] Invalid method: $Method."
+          }
+      }
+  }
+script_end: Remove-NetworkShares {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

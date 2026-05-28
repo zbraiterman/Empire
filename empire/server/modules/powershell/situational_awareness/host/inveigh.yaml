@@ -143,6 +143,10 @@ options:
     description: (Y/N) Enable/Disable Inveigh's proxy server authentication capture.
     required: false
     value: ''
+    strict: true
+    suggested_values:
+      - Y
+      - N
   - name: ProxyPort
     description: 'TCP port for Inveigh proxy listener. Default: 8492.'
     required: false

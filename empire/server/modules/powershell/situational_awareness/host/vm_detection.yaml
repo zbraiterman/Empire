@@ -1,0 +1,101 @@
+name: VM-Detection
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Detects if the target system is running in a virtualized
+  environment by performing multiple checks. Queries WMI thermal
+  zone data (virtual machines typically lack thermal sensors),
+  checks Win32_ComputerSystem manufacturer and model for known
+  hypervisor strings (VMware, VirtualBox, Hyper-V, Parallels),
+  and examines registry entries for VM-related artifacts.
+software: ''
+tactics: [TA0005, TA0007]
+techniques: [T1497.001]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: true
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-VMDetection {
+      $vmDetected = $false
+      $results = @()
+
+      # Check 1: WMI Thermal Zone (VMs typically error or return no data)
+      $error.Clear()
+      $thermal = Get-WmiObject -Query "SELECT * FROM MSAcpi_ThermalZoneTemperature" -ErrorAction SilentlyContinue
+      if ($error -or -not $thermal) {
+          $results += "[!] Thermal zone check: No thermal data (possible VM)."
+          $vmDetected = $true
+      } else {
+          $results += "[*] Thermal zone check: Thermal data found (likely physical)."
+      }
+      $error.Clear()
+
+      # Check 2: Win32_ComputerSystem Manufacturer/Model
+      $cs = Get-WmiObject -Class Win32_ComputerSystem
+      $manufacturer = $cs.Manufacturer.ToLower()
+      $model = $cs.Model.ToLower()
+      $results += "[*] Manufacturer: $($cs.Manufacturer)"
+      $results += "[*] Model: $($cs.Model)"
+
+      $vmStrings = @("vmware", "virtualbox", "virtual", "xen", "qemu", "parallels", "innotek", "oracle")
+      foreach ($vmStr in $vmStrings) {
+          if ($manufacturer.Contains($vmStr) -or $model.Contains($vmStr)) {
+              $results += "[!] VM indicator found in hardware info: $vmStr"
+              $vmDetected = $true
+          }
+      }
+
+      if (($manufacturer -eq "microsoft corporation") -and $model.Contains("virtual")) {
+          $results += "[!] Hyper-V virtual machine detected."
+          $vmDetected = $true
+      }
+
+      # Check 3: Registry VM artifacts
+      $regPaths = @(
+          "HKLM:\SOFTWARE\VMware, Inc.\VMware Tools",
+          "HKLM:\SOFTWARE\Oracle\VirtualBox Guest Additions",
+          "HKLM:\SYSTEM\CurrentControlSet\Services\vmtools",
+          "HKLM:\SYSTEM\CurrentControlSet\Services\VBoxGuest"
+      )
+      foreach ($path in $regPaths) {
+          if (Test-Path $path) {
+              $results += "[!] VM registry key found: $path"
+              $vmDetected = $true
+          }
+      }
+
+      # Check 4: BIOS information
+      $bios = Get-WmiObject -Class Win32_BIOS
+      $biosStr = "$($bios.Manufacturer) $($bios.SMBIOSBIOSVersion)".ToLower()
+      foreach ($vmStr in $vmStrings) {
+          if ($biosStr.Contains($vmStr)) {
+              $results += "[!] VM indicator found in BIOS: $vmStr"
+              $vmDetected = $true
+          }
+      }
+
+      $results += ""
+      if ($vmDetected) {
+          $results += "[+] RESULT: Virtualization environment DETECTED."
+      } else {
+          $results += "[+] RESULT: No virtualization indicators found (likely physical)."
+      }
+
+      $results -join "`n"
+  }
+script_end: Invoke-VMDetection {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

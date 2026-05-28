@@ -10,7 +10,7 @@ description: C# module that uses SharpUp to perform privilege escalation checks 
 software: ''
 tactics: [TA0007]
 techniques: [T1012, T1518]
-background: true
+background: false
 output_extension: ''
 needs_admin: false
 opsec_safe: true
@@ -24,16 +24,6 @@ options:
     strict: false
     suggested_values:
       - audit
-  - name: Background
-    description: Run as a background job (non-blocking). Can be killed via the jobs/kill_job
-      endpoint.
-    required: false
-    value: 'false'
-    type: bool
-    suggested_values:
-      - 'true'
-      - 'false'
-    strict: true
 csharp:
   UnsafeCompile: false
   CompatibleDotNetVersions:
@@ -100,43 +90,7 @@ csharp:
       CompatibleDotNetVersions:
         - Net35
         - Net40
-      ReferenceAssemblies:
-        - Name: System.ServiceProcess.dll
-          Location: net40\System.ServiceProcess.dll
-          DotNetVersion: Net40
-        - Name: System.Management.dll
-          Location: net40\System.Management.dll
-          DotNetVersion: Net40
-        - Name: System.dll
-          Location: net40\System.dll
-          DotNetVersion: Net40
-        - Name: System.Core.dll
-          Location: net40\System.Core.dll
-          DotNetVersion: Net40
-        - Name: mscorlib.dll
-          Location: net40\mscorlib.dll
-          DotNetVersion: Net40
-        - Name: System.XML.dll
-          Location: net35\System.XML.dll
-          DotNetVersion: Net35
-        - Name: System.ServiceProcess.dll
-          Location: net35\System.ServiceProcess.dll
-          DotNetVersion: Net35
-        - Name: System.Management.dll
-          Location: net35\System.Management.dll
-          DotNetVersion: Net35
-        - Name: mscorlib.dll
-          Location: net35\mscorlib.dll
-          DotNetVersion: Net35
-        - Name: System.Core.dll
-          Location: net35\System.Core.dll
-          DotNetVersion: Net35
-        - Name: System.dll
-          Location: net35\System.dll
-          DotNetVersion: Net35
-        - Name: System.XML.dll
-          Location: net40\System.XML.dll
-          DotNetVersion: Net40
+      ReferenceAssemblies: []
       EmbeddedResources: []
   ReferenceAssemblies: []
   EmbeddedResources: []

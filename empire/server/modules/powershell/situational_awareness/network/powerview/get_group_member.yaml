@@ -43,15 +43,23 @@ options:
     required: false
     value: ''
   - name: Recurse
-    description: Switch. If the group member is a group, recursively try to query
-      its members as well.
+    description: If the group member is a group, recursively try to query its members
+      as well.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: RecurseUsingMatchingRule
-    description: Switch. Use LDAP_MATCHING_RULE_IN_CHAIN in the LDAP search query
-      when -Recurse is specified.
+    description: Use LDAP_MATCHING_RULE_IN_CHAIN in the LDAP search query when -Recurse
+      is specified.
     required: false
-    value: ''
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
   - name: LDAPFilter
     description: Specifies an LDAP query string that is used to filter Active Directory
       objects.

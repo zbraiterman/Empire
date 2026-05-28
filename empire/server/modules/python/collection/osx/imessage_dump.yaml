@@ -46,8 +46,12 @@ options:
     required: false
     value: ''
   - name: Debug
-    description: Enable a find keyword to search for within the iMessage Database.
+    description: Enable debug output for troubleshooting.
     required: true
     value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
 advanced:
   custom_generate: true

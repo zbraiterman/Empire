@@ -1,0 +1,87 @@
+name: Base64-Encode-File
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Base64 encode a file on disk for obfuscation or exfiltration
+  preparation. Reads the target file as raw bytes and converts it to
+  a Base64-encoded string, optionally writing the result to an output
+  file. This technique is commonly used by adversaries to obfuscate
+  payloads, encode binaries for transport, or prepare data for
+  exfiltration over text-based channels such as DNS or HTTP.
+software: ''
+tactics: [TA0005]
+techniques: [T1027]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: true
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: FilePath
+    description: Path to the file to Base64 encode.
+    required: true
+    value: ''
+  - name: OutputPath
+    description: >-
+      Path to write the Base64-encoded output. If empty, the encoded content is printed
+      to stdout.
+    required: false
+    value: ''
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-Base64EncodeFile {
+      param(
+          [string]$FilePath,
+          [string]$OutputPath
+      )
+
+      # Normalize: trim whitespace, expand env vars like $env:USERPROFILE.
+      $FilePath = $ExecutionContext.InvokeCommand.ExpandString($FilePath.Trim())
+      if ($OutputPath) {
+          $OutputPath = $ExecutionContext.InvokeCommand.ExpandString($OutputPath.Trim())
+      }
+
+      # Use .NET's File.Exists — it's provider-agnostic and sidesteps any
+      # PSDrive / Test-Path quirks that can trip up absolute Windows paths.
+      if (-not [System.IO.File]::Exists($FilePath)) {
+          Write-Output "[-] File not found: $FilePath"
+          $parent = [System.IO.Path]::GetDirectoryName($FilePath)
+          if ($parent -and [System.IO.Directory]::Exists($parent)) {
+              Write-Output "[*] Parent directory exists: $parent"
+              Write-Output "[*] Files in parent directory:"
+              Get-ChildItem -LiteralPath $parent -File -ErrorAction SilentlyContinue |
+                  ForEach-Object { Write-Output "    $($_.Name)" }
+          } else {
+              Write-Output "[-] Parent directory does not exist: $parent"
+          }
+          return
+      }
+
+      $fileInfo = Get-Item -LiteralPath $FilePath
+      Write-Output "[*] Encoding file: $FilePath ($($fileInfo.Length) bytes)"
+
+      $bytes = [System.IO.File]::ReadAllBytes($FilePath)
+      $encoded = [System.Convert]::ToBase64String($bytes)
+
+      if ($OutputPath) {
+          [System.IO.File]::WriteAllText($OutputPath, $encoded)
+          Write-Output "[+] Encoded content written to: $OutputPath"
+          Write-Output "[+] Encoded size: $($encoded.Length) characters"
+      }
+      else {
+          Write-Output "[+] Encoded size: $($encoded.Length) characters"
+          Write-Output $encoded
+      }
+  }
+script_end: Invoke-Base64EncodeFile {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

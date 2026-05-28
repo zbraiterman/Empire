@@ -92,31 +92,90 @@ class ListenerService:
 
         return db_listener, None
 
-    def create_listener(self, db: Session, listener_req):
+    def _finalize_created_listener(self, db, template_instance, db_listener):
+        """Post-start hook for newly created listeners."""
+        template_instance.host_address = db_listener.host_address
+        hooks.run_hooks(hooks.AFTER_LISTENER_CREATED_HOOK, db, db_listener)
+        return db_listener, None
+
+    def _persist_new_listener(self, db, template_instance, template_name, success):
+        """Create Listener DB record after a successful start."""
+        name = template_instance.options["Name"]["Value"]
+        if not success:
+            msg = f"Failed to start listener '{name}'"
+            log.error(msg)
+            return None, msg
+
+        category = template_instance.info["Category"]
+        listener_options = copy.deepcopy(template_instance.options)
+
+        host_address, err = self.validate_listener_address(listener_options)
+        if err:
+            log.error(err)
+            return None, err
+
+        db_listener = models.Listener(
+            name=name,
+            module=template_name,
+            listener_category=category,
+            enabled=True,
+            options=listener_options,
+            host_address=host_address,
+        )
+
+        db.add(db_listener)
+        db.flush()
+
+        log.info(f'Listener "{name}" successfully started')
+        self._active_listeners[db_listener.id] = template_instance
+
+        return db_listener, None
+
+    def _finalize_existing_listener(self, db, listener, template_instance, success):
+        """Finalize an existing listener after start attempt."""
+        db.flush()
+        if success:
+            self._active_listeners[listener.id] = template_instance
+            log.info(f'Listener "{listener.name}" successfully started')
+            return listener, None
+        return None, f'Listener "{listener.name}" failed to start'
+
+    def _validate_create(self, db, listener_req):
+        """Shared validation preamble for create_listener."""
         if self.get_by_name(db, listener_req.name):
             return None, f"Listener with name {listener_req.name} already exists."
 
         listener_req.options["Name"] = listener_req.name
-
-        template_instance, err = self._validate_listener_options(
+        return self._validate_listener_options(
             db, listener_req.template, listener_req.options
         )
 
-        if err:
-            return None, err
-
-        db_listener, err = self._start_listener(
-            db, template_instance, listener_req.template
+    def _finish_create(self, db, template_instance, template_name, success):
+        """Persist + finalize after a successful (or failed) listener start."""
+        db_listener, err = self._persist_new_listener(
+            db, template_instance, template_name, success
         )
+        if err:
+            return None, err
+        return self._finalize_created_listener(db, template_instance, db_listener)
 
+    def create_listener(self, db: Session, listener_req):
+        template_instance, err = self._validate_create(db, listener_req)
         if err:
             return None, err
 
-        template_instance.host_address = db_listener.host_address
+        name = template_instance.options["Name"]["Value"]
+        try:
+            log.info(f"v2: Starting listener '{name}'")
+            success = template_instance.start()
+        except Exception as e:
+            msg = f"Failed to start listener '{name}': {e}"
+            log.error(msg)
+            return None, msg
 
-        hooks.run_hooks(hooks.AFTER_LISTENER_CREATED_HOOK, db, db_listener)
-
-        return db_listener, None
+        return self._finish_create(
+            db, template_instance, listener_req.template, success
+        )
 
     def stop_listener(self, db_listener: models.Listener):
         if self._active_listeners.get(db_listener.id):
@@ -131,26 +190,26 @@ class ListenerService:
         for listener in self._active_listeners.values():
             listener.shutdown()
 
-    def start_existing_listener(self, db: Session, listener: models.Listener):
+    def _validate_existing(self, db, listener):
+        """Shared validation for start_existing_listener."""
         listener.enabled = True
-
-        options = {x[0]: x[1]["Value"] for x in listener.options.items()}
+        options = {key: meta["Value"] for key, meta in listener.options.items()}
         template_instance, err = self._validate_listener_options(
             db, listener.module, options
         )
-
         if err:
             log.error(err)
+        return template_instance, err
+
+    def start_existing_listener(self, db: Session, listener: models.Listener):
+        template_instance, err = self._validate_existing(db, listener)
+        if err:
             return None, err
 
         success = template_instance.start()
-        db.flush()
-
-        if success:
-            self._active_listeners[listener.id] = template_instance
-            log.info(f'Listener "{listener.name}" successfully started')
-            return listener, None
-        return None, f'Listener "{listener.name}" failed to start'
+        return self._finalize_existing_listener(
+            db, listener, template_instance, success
+        )
 
     def start_existing_listeners(self):
         with SessionLocal.begin() as db:
@@ -161,50 +220,6 @@ class ListenerService:
             )
             for listener in listeners:
                 self.start_existing_listener(db, listener)
-
-    def _start_listener(self, db: Session, template_instance, template_name):
-        category = template_instance.info["Category"]
-        name = template_instance.options["Name"]["Value"]
-        try:
-            log.info(f"v2: Starting listener '{name}'")
-            success = template_instance.start()
-
-            if not success:
-                msg = f"Failed to start listener '{name}'"
-                log.error(msg)
-                return None, msg
-
-            listener_options = copy.deepcopy(template_instance.options)
-
-            # in a breaking change we could just store a str,str dict for the options.
-            # we don't add the listener to the db unless it successfully starts. Makes it a problem when trying
-            # to split this out.
-            host_address, err = self.validate_listener_address(listener_options)
-            if err:
-                log.error(err)
-                return None, err
-
-            db_listener = models.Listener(
-                name=name,
-                module=template_name,
-                listener_category=category,
-                enabled=True,
-                options=listener_options,
-                host_address=host_address,
-            )
-
-            db.add(db_listener)
-            db.flush()
-
-            log.info(f'Listener "{name}" successfully started')
-            self._active_listeners[db_listener.id] = template_instance
-
-            return db_listener, None
-
-        except Exception as e:
-            msg = f"Failed to start listener '{name}': {e}"
-            log.error(msg)
-            return None, msg
 
     @staticmethod
     def validate_listener_address(listener_options):

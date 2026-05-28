@@ -44,23 +44,32 @@ options:
     description: Agent to run module on.
     required: true
     value: ''
-  - name: Username
-    description: SQL Server or domain account to authenticate with. Only used for
-      CheckAll
-    required: false
-    value: ''
-  - name: Password
-    description: SQL Server or domain account password to authenticate with. Only
-      used for CheckAll
-    required: false
-    value: ''
   - name: Instance
-    description: SQL Server instance to connection to.
+    description: SQL Server instance to test (e.g. server\instance).
     required: false
     value: ''
   - name: CheckAll
-    description: Check all systems retrieved by Get-SQLInstanceDomain.
+    description: Discover and check all domain SQL Server instances.
+    required: false
+    value: 'False'
+    strict: true
+    suggested_values:
+      - 'True'
+      - 'False'
+  - name: Username
+    description: Domain account to authenticate to AD with (domain\user). Used with
+      CheckAll.
     required: false
     value: ''
+    depends_on:
+      - name: CheckAll
+        values: ['True']
+  - name: Password
+    description: Domain account password. Used with CheckAll.
+    required: false
+    value: ''
+    depends_on:
+      - name: CheckAll
+        values: ['True']
 advanced:
   custom_generate: true

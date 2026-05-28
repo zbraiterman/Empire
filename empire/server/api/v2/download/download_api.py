@@ -43,7 +43,7 @@ router = APIRouter(
 )
 
 
-async def get_download(
+def get_download(
     uid: int,
     db: CurrentSession,
     download_service: DownloadServiceDep,
@@ -60,7 +60,7 @@ DownloadDep = Annotated[models.Download, Depends(get_download)]
 
 
 @router.get("/{uid}/download", response_class=FileResponse)
-async def download_download(
+def download_download(
     uid: int,
     db: CurrentSession,
     db_download: DownloadDep,
@@ -77,7 +77,7 @@ tag_api.add_endpoints_to_taggable(router, "/{uid}/tags", get_download)
     "/{uid}",
     response_model=Download,
 )
-async def read_download(
+def read_download(
     uid: int,
     db: CurrentSession,
     db_download: DownloadDep,
@@ -86,7 +86,7 @@ async def read_download(
 
 
 @router.get("/", response_model=Downloads)
-async def read_downloads(
+def read_downloads(
     db: CurrentSession,
     limit: int = -1,
     page: int = 1,
@@ -121,7 +121,7 @@ async def read_downloads(
 
 
 @router.post("/", status_code=201, response_model=Download)
-async def create_download(
+def create_download(
     user: CurrentActiveUser,
     db: CurrentSession,
     download_service: DownloadServiceDep,

@@ -302,7 +302,7 @@ def test_evaluate_dependencies_single_dependency_met():
     option = {
         "name": "Option1",
         "Value": "Test",
-        "depends_on": [{"name": "Option2", "values": ["True"]}],
+        "DependsOn": [{"name": "Option2", "values": ["True"]}],
     }
     params = {"Option1": "Test", "Option2": "True"}
     assert evaluate_dependencies(option, params) is True
@@ -312,7 +312,7 @@ def test_evaluate_dependencies_single_dependency_not_met():
     option = {
         "name": "Option1",
         "Value": "Test",
-        "depends_on": [{"name": "Option2", "values": ["True"]}],
+        "DependsOn": [{"name": "Option2", "values": ["True"]}],
     }
     params = {"Option1": "Test", "Option2": "False"}
     assert evaluate_dependencies(option, params) is False
@@ -322,7 +322,7 @@ def test_evaluate_dependencies_multiple_dependencies_met():
     option = {
         "name": "Option1",
         "Value": "Test",
-        "depends_on": [
+        "DependsOn": [
             {"name": "Option2", "values": ["True"]},
             {"name": "Option3", "values": ["Enabled"]},
         ],
@@ -335,7 +335,7 @@ def test_evaluate_dependencies_multiple_dependencies_not_met():
     option = {
         "name": "Option1",
         "Value": "Test",
-        "depends_on": [
+        "DependsOn": [
             {"name": "Option2", "values": ["True"]},
             {"name": "Option3", "values": ["Enabled"]},
         ],
@@ -348,7 +348,7 @@ def test_evaluate_dependencies_dependency_not_present_in_params():
     option = {
         "name": "Option1",
         "Value": "Test",
-        "depends_on": [{"name": "Option2", "values": ["True"]}],
+        "DependsOn": [{"name": "Option2", "values": ["True"]}],
     }
     params = {"Option1": "Test"}
     assert evaluate_dependencies(option, params) is False
@@ -393,13 +393,13 @@ def test_validate_options_dependency_not_met():
         "DependentOption": {
             "Description": "An option with dependencies",
             "Required": True,
-            "depends_on": [{"name": "AnotherOption", "values": ["True"]}],
+            "DependsOn": [{"name": "AnotherOption", "values": ["True"]}],
         }
     }
     options = {"AnotherOption": "False"}
     cleaned_options, err = validate_options(instance_options, options, None, None)
 
-    assert "DependentOption" not in cleaned_options
+    assert cleaned_options["DependentOption"] == ""
     assert err is None
 
 
@@ -408,7 +408,7 @@ def test_validate_options_dependency_met(session_local):
         "DependentOption": {
             "Description": "An option with dependencies",
             "Required": True,
-            "depends_on": [{"name": "AnotherOption", "values": ["True"]}],
+            "DependsOn": [{"name": "AnotherOption", "values": ["True"]}],
             "Value": "SomeValue",
         }
     }

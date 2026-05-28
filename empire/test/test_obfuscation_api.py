@@ -1,9 +1,13 @@
 import os
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from starlette import status
+
+from empire.server.core.obfuscation_service import ObfuscationService
 
 
 def test_get_keyword_not_found(client, admin_auth_header):
@@ -266,3 +270,120 @@ def test_preobfuscate_delete(main, client, admin_auth_header, empire_config):
             root_rep = root.replace(str(module_dir), str(obf_module_dir))
             path = Path(root_rep + "/" + file)
             assert not path.exists()
+
+
+def test_preobfuscate_modules_empty_list(client, admin_auth_header):
+    response = client.post(
+        "/api/v2/obfuscation/modules/preobfuscate",
+        headers=admin_auth_header,
+        json=[],
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "must not be empty" in response.json()["detail"]
+
+
+def test_preobfuscate_modules_not_found(client, admin_auth_header):
+    response = client.post(
+        "/api/v2/obfuscation/modules/preobfuscate",
+        headers=admin_auth_header,
+        json=["nonexistent_module_id"],
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "nonexistent_module_id" in response.json()["detail"]
+
+
+def test_preobfuscate_modules_deduplicates(client, admin_auth_header, main):
+    """Duplicate module IDs should be accepted (deduplicated), not rejected."""
+    with patch.object(main.modulesv2, "preobfuscate_module_by_id"):
+        response = client.post(
+            "/api/v2/obfuscation/modules/preobfuscate",
+            headers=admin_auth_header,
+            json=[
+                "powershell_situational_awareness_network_arpscan",
+                "powershell_situational_awareness_network_arpscan",
+            ],
+        )
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+
+
+def test_preobfuscate_modules_valid(client, admin_auth_header, main):
+    with patch.object(main.modulesv2, "preobfuscate_module_by_id") as mock_preobfuscate:
+        response = client.post(
+            "/api/v2/obfuscation/modules/preobfuscate",
+            headers=admin_auth_header,
+            json=["powershell_situational_awareness_network_arpscan"],
+        )
+
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    mock_preobfuscate.assert_called_once_with(
+        "powershell_situational_awareness_network_arpscan"
+    )
+
+
+def test_obfuscate_uses_config_timeout():
+    """obfuscate() uses empire_config.obfuscation_timeout as the default timeout."""
+    service = MagicMock(spec=ObfuscationService)
+    service.obfuscate = ObfuscationService.obfuscate.__get__(service)
+    service.main_menu = MagicMock()
+    service.main_menu.install_path = "/tmp/fake"
+    service.obfuscate_keywords = lambda data: data
+    service._convert_obfuscation_command = lambda cmd: cmd
+
+    with patch("empire.server.core.obfuscation_service.empire_config") as mock_config:
+        mock_config.obfuscation.timeout = 999
+        with patch("empire.server.core.obfuscation_service.data_util") as mock_util:
+            mock_util.is_powershell_installed.return_value = True
+            mock_util.get_powershell_name.return_value = "pwsh"
+            with patch("empire.server.core.obfuscation_service.subprocess") as mock_sub:
+                mock_sub.TimeoutExpired = subprocess.TimeoutExpired
+                mock_sub.run.return_value = MagicMock(returncode=0, stderr=b"")
+                service.obfuscate("echo test", "Token\\All\\1")
+                _, kwargs = mock_sub.run.call_args
+                assert kwargs["timeout"] == 999  # noqa: PLR2004
+
+
+def test_obfuscate_explicit_timeout_overrides_config():
+    """An explicit timeout parameter overrides the config value."""
+    service = MagicMock(spec=ObfuscationService)
+    service.obfuscate = ObfuscationService.obfuscate.__get__(service)
+    service.main_menu = MagicMock()
+    service.main_menu.install_path = "/tmp/fake"
+    service.obfuscate_keywords = lambda data: data
+    service._convert_obfuscation_command = lambda cmd: cmd
+
+    with patch("empire.server.core.obfuscation_service.empire_config") as mock_config:
+        mock_config.obfuscation.timeout = 999
+        with patch("empire.server.core.obfuscation_service.data_util") as mock_util:
+            mock_util.is_powershell_installed.return_value = True
+            mock_util.get_powershell_name.return_value = "pwsh"
+            with patch("empire.server.core.obfuscation_service.subprocess") as mock_sub:
+                mock_sub.TimeoutExpired = subprocess.TimeoutExpired
+                mock_sub.run.return_value = MagicMock(returncode=0, stderr=b"")
+                service.obfuscate("echo test", "Token\\All\\1", timeout=42)
+                _, kwargs = mock_sub.run.call_args
+                assert kwargs["timeout"] == 42  # noqa: PLR2004
+
+
+def test_obfuscate_zero_timeout_disables_timeout():
+    """A timeout of 0 (from config) passes None to subprocess (no timeout)."""
+    service = MagicMock(spec=ObfuscationService)
+    service.obfuscate = ObfuscationService.obfuscate.__get__(service)
+    service.main_menu = MagicMock()
+    service.main_menu.install_path = "/tmp/fake"
+    service.obfuscate_keywords = lambda data: data
+    service._convert_obfuscation_command = lambda cmd: cmd
+
+    with patch("empire.server.core.obfuscation_service.empire_config") as mock_config:
+        mock_config.obfuscation.timeout = 0
+        with patch("empire.server.core.obfuscation_service.data_util") as mock_util:
+            mock_util.is_powershell_installed.return_value = True
+            mock_util.get_powershell_name.return_value = "pwsh"
+            with patch("empire.server.core.obfuscation_service.subprocess") as mock_sub:
+                mock_sub.TimeoutExpired = subprocess.TimeoutExpired
+                mock_sub.run.return_value = MagicMock(returncode=0, stderr=b"")
+                service.obfuscate("echo test", "Token\\All\\1")
+                _, kwargs = mock_sub.run.call_args
+                assert kwargs["timeout"] is None

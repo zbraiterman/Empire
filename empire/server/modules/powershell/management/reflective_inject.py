@@ -74,5 +74,6 @@ class Module:
 
         script_end += "\r\n"
         script_end += f"Remove-Item -Path {full_upload_path}"
+        script_end += '\r\n"Invoke-ReflectivePEInjection completed."'
 
         return script, script_end

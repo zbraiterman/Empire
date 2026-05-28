@@ -182,4 +182,6 @@ function Invoke-WScriptBypassUAC
             Invoke-WscriptElevate
         }
     }else{"[!] WARNING: Target Not Vulnerable"}
+
+    "Invoke-WScriptBypassUAC completed."
 }
