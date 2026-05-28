@@ -51,13 +51,13 @@ database:
     ip_allow_list: []
     ip_deny_list: []
 empire_compiler:
-  repo: BC-SECURITY/Empire-Compiler
-  ref: v1.0.0
+  repo: https://github.com/BC-SECURITY/Starkiller.git
+  ref: v3.5.0
   # Path to the confuser xml project file you want to use
   confuser_proj: empire/server/data/confuser.crproj
 starkiller:
   enabled: true
-  repo: git@github.com:BC-SECURITY/Starkiller-Sponsors.git
+  repo: https://github.com/BC-SECURITY/Starkiller.git
   # Can be a branch, tag, or commit hash
   ref: sponsors-main
 submodules:
